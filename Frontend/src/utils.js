@@ -163,6 +163,15 @@ class BackendClient {
         return await this.sendRequest("DELETE", "prompts");
     }
 
+    async getContainerApprovals(containerId) {
+        return await this.sendRequest("GET", `containers/${containerId}/approval`);
+    }
+
+    async setContainerApproval(containerId, toolName, approval) {
+        const body = {tool_name: toolName, approval: approval};
+        return await this.sendRequest("PATCH", `containers/${containerId}/approval`, body);
+    }
+
     // mcp
 
     async getMCPs() {

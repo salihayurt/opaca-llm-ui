@@ -25,7 +25,7 @@
         />
         <div class="accordion text-start" id="agents-accordion">
 
-            <div v-for="{containerId, agents, image} in this.getContainers()" :key="containerId"
+            <div v-for="{containerId, agents, image, approvals} in this.getContainers()" :key="containerId"
                  class="accordion-item">
 
                 <!-- Container Header -->
@@ -105,7 +105,28 @@
                                             <p v-if="action.description">
                                                 <strong>{{ Localizer.get('agents_description') }}:</strong>
                                                 {{ action.description }}
-                                            </p>
+                                            </p>                                            
+                                            <!-- Action Permissions -->
+                                            <div class="d-flex align-items-baseline mb-3">
+                                                <strong class="me-2">Approval:</strong>
+                                                <div class="btn-group btn-group-sm w-100" role="group">
+                                                    <input type="radio" class="btn-check" :name="`approval-${containerId}-${agentIndex}-${actionIndex}`" :id="`btn-ask-${containerId}-${agentIndex}-${actionIndex}`" autocomplete="off"
+                                                        @change="e => setApproval(containerId, agentId, action.name, 'ask')"
+                                                        :checked="(approvals?.[`${agentId}--${action.name}`] || 'allow') === 'ask'">
+                                                    <label class="btn btn-outline-secondary container-approval-ask" :for="`btn-ask-${containerId}-${agentIndex}-${actionIndex}`">Ask</label>
+
+                                                    <input type="radio" class="btn-check" :name="`approval-${containerId}-${agentIndex}-${actionIndex}`" :id="`btn-deny-${containerId}-${agentIndex}-${actionIndex}`" autocomplete="off"
+                                                        @change="e => setApproval(containerId, agentId, action.name, 'deny')"
+                                                        :checked="(approvals?.[`${agentId}--${action.name}`] || 'allow') === 'deny'">
+                                                    <label class="btn btn-outline-secondary container-approval-deny" :for="`btn-deny-${containerId}-${agentIndex}-${actionIndex}`">Deny</label>
+
+                                                    <input type="radio" class="btn-check" :name="`approval-${containerId}-${agentIndex}-${actionIndex}`" :id="`btn-allow-${containerId}-${agentIndex}-${actionIndex}`" autocomplete="off"
+                                                        @change="e => setApproval(containerId, agentId, action.name, 'allow')"
+                                                        :checked="(approvals?.[`${agentId}--${action.name}`] || 'allow') === 'allow'">
+                                                    <label class="btn btn-outline-secondary container-approval-allow" :for="`btn-allow-${containerId}-${agentIndex}-${actionIndex}`">Allow</label>
+                                                </div>
+                                            </div>
+
                                             <strong>{{ Localizer.get('agents_parameters') }}:</strong>
                                             <pre class="json-box">{{ formatJSON(action.parameters) }}</pre>
                                             <strong>{{ Localizer.get('agents_result') }}:</strong>
@@ -160,6 +181,23 @@ export default {
         };
     },
     methods: {
+        async setApproval(containerId, agentName, actionName, approval) {
+            const toolName = `${agentName}--${actionName}`;
+            
+            // Optimistically update the UI locally
+            const container = this.platformContainers.find(c => c.containerId === containerId);
+            if (container) {
+                if (!container.approvals) container.approvals = {};
+                container.approvals[toolName] = approval;
+            }
+
+            try {
+                await backendClient.setContainerApproval(containerId, toolName, approval);
+            } catch (err) {
+                console.error("Failed to update approval", err);
+            }
+        },
+
         async updatePlatformInfo() {
             this.isLoading = true;
             try {
@@ -167,7 +205,19 @@ export default {
                     ? await backendClient.getContainers()
                     : [];
                 const internalContainers = await backendClient.getInternalTools();
-                this.platformContainers = [...externalContainers, ...internalContainers];
+                const allContainers = [...externalContainers, ...internalContainers];
+                
+                // Fetch approvals for each container
+                for (let container of allContainers) {
+                    try {
+                        const appRes = await backendClient.getContainerApprovals(container.containerId);
+                        container.approvals = appRes || {};
+                    } catch (err) {
+                        container.approvals = {};
+                    }
+                }
+                
+                this.platformContainers = allContainers;
             } finally {
                 this.isLoading = false;
             }
@@ -507,5 +557,23 @@ export default {
 
 .delete-icon:hover {
     color: var(--text-danger-color);
+}
+
+.btn-check:checked + .btn.btn-outline-secondary.container-approval-ask {
+    background-color: var(--primary-color, #0d6efd);
+    border-color: var(--primary-color, #0d6efd);
+    color: #fff;
+}
+
+.btn-check:checked + .btn.btn-outline-secondary.container-approval-deny {
+    background-color: var(--text-danger-color, #dc3545);
+    border-color: var(--text-danger-color, #dc3545);
+    color: #fff;
+}
+
+.btn-check:checked + .btn.btn-outline-secondary.container-approval-allow {
+    background-color: #198754;
+    border-color: #198754;
+    color: #fff;
 }
 </style>

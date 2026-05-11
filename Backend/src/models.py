@@ -365,6 +365,7 @@ class SessionData(BaseModel):
     notifications_chats_map: Dict[int, Set[str]] = Field(default_factory=dict)
     valid_until: float = -1
     mcp_servers: Dict[str, MCPServer] = Field(default_factory=dict)
+    tool_approvals: Dict[str, Dict[str, Literal["ask", "deny", "allow"]]] = Field(default_factory=dict)
     blocked: bool = False
     prompts: SessionPrompts | None = None
 
@@ -456,6 +457,18 @@ class SessionData(BaseModel):
             raise KeyError(f"Tool '{full_name}' not found in MCP server '{server_label}'.")
         
         tool.approval = approval
+
+    def get_tool_approval(self, tool_name: str) -> Literal["ask", "deny", "allow"]:
+        for container_approvals in self.tool_approvals.values():
+            if tool_name in container_approvals:
+                return container_approvals[tool_name]
+        return "allow"
+
+    def set_tool_approval(self, container_id: str, tool_name: str, approval: Literal["ask", "deny", "allow"]):
+        if container_id not in self.tool_approvals:
+            self.tool_approvals[container_id] = {}
+        self.tool_approvals[container_id][tool_name] = approval
+
 
     async def add_mcp_server(self, params: Dict[str, Any]) -> bool:
         """Adds a new mcp server json"""
@@ -593,7 +606,7 @@ class MCPCreateMessage(BaseModel):
     content: Dict[str, Any]
 
 
-class MCPToolApproval(BaseModel):
+class ToolApproval(BaseModel):
     tool_name: str
     approval: Literal["ask", "deny", "allow"]
 

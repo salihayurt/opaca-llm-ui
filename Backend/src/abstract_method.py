@@ -241,6 +241,13 @@ class AbstractMethod(ABC):
         else:
             agent_name, action_name = None, tool_name
 
+        approval_state = self.session.get_tool_approval(tool_name)
+        if approval_state == 'deny':
+            return ToolCall(id=tool_id, type="opaca", name=tool_name, args=tool_args, result="Execution denied by user settings, do not attempt again.")
+        if approval_state == 'ask':
+            if not await self.check_confirmation(tool_name, tool_args, force_ask=True):
+                return ToolCall(id=tool_id, type="opaca", name=tool_name, args=tool_args, result="Execution declined by user, do not attempt again.")
+
         if not (login_attempt_retry or await self.check_confirmation(tool_name, tool_args)):
             return ToolCall(id=tool_id, type="opaca", name=tool_name, args=tool_args, result="Execution declined by user, do not attempt again.")
 
@@ -309,6 +316,16 @@ class AbstractMethod(ABC):
         """
         tools, error = openapi_to_functions(await self.session.opaca_client.get_actions_openapi(inline_refs=True))
 
+        if self.internal_tools and include_internal:
+            tools.extend(self.internal_tools.get_internal_tools_openai())
+
+        # Filter out OPACA/internal tools that are explicitly denied
+        filtered_tools = []
+        for tool in tools:
+            if self.session.get_tool_approval(tool["name"]) != 'deny':
+                filtered_tools.append(tool)
+        tools = filtered_tools
+
         if include_mcp and self.session.mcp_servers:
             for server in self.session.mcp_servers.values():
                 for tool in server.tools.values():
@@ -317,8 +334,6 @@ class AbstractMethod(ABC):
                         continue
                     tools.append(tool.cast_to_openai_tool())
 
-        if self.internal_tools and include_internal:
-            tools.extend(self.internal_tools.get_internal_tools_openai())
         if len(tools) > max_tools:
             error += (f"WARNING: Your number of tools ({len(tools)}) exceeds the maximum tool limit "
                       f"of {max_tools}. All tools after index {max_tools} will be ignored!\n")
