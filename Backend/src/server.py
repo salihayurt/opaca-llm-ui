@@ -434,14 +434,16 @@ async def delete_file(file_id: str, ignore_error: bool = False, session: Session
     return False
 
 
-@app.patch("/files/{file_id}", description="Mark a file as suspended or unsuspended.", tags=["files"])
-async def update_file(file_id: str, suspend: bool = None, name: str = None, session: SessionData = Depends(handle_session_http)) -> bool:
+@app.patch("chats/{chat_id}/files/{file_id}", description="Mark a file as suspended or unsuspended.", tags=["files"])
+async def update_file(chat_id: str, file_id: str, active: bool = None, name: str = None, session: SessionData = Depends(handle_session_http)) -> bool:
     files = session.uploaded_files
+    chat = session.get_or_create_chat(chat_id, False)
 
     if file_id in files:
         file = files[file_id]
-        if suspend is not None:
-            file.suspended = suspend
+        if active is not None:
+            chat.active_files[file_id] = active
+            chat.update_modified()
         if name is not None:
             rename_file(file, name)
         return True

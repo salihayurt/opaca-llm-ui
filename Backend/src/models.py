@@ -175,7 +175,6 @@ class OpacaFile(BaseModel):
     content_type: str
     file_name: str
     host_ids: Dict[str, str] = Field(default_factory=dict)
-    suspended: bool = False
 
 
 class ChatMessage(BaseModel):
@@ -255,6 +254,7 @@ class Chat(BaseModel):
         time_modified: when the chat was last used
         is_aborted: Boolean indicating whether the current interaction should be aborted.
         is_finished: Boolean indicating whether the chat has finished generating a response for its last query.
+        active_files: Dict mapping file_id -> bool for whether the file is active in this chat.
         messages: Chat history (user queries and final LLM responses), used in subsequent requests. (derived)
     """
     chat_id: str
@@ -264,6 +264,7 @@ class Chat(BaseModel):
     time_modified: datetime = Field(default_factory=lambda: datetime.now(tz=timezone.utc))
     is_aborted: bool = False
     is_finished: bool = True
+    active_files: Dict[str, bool] = []
 
     @property
     def messages(self) -> Iterator[ChatMessage]:

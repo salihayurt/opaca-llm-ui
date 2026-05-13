@@ -110,7 +110,7 @@ class AbstractMethod(ABC):
         exec_time = time.time()
         agent_message = AgentMessage(agent=agent, content='', tools=[])
 
-        file_message_parts = await upload_files(self.session, model)
+        file_message_parts = await upload_files(self.session, self.chat, model)
 
         # Modify the last user message to include file parts
         if file_message_parts:
