@@ -107,8 +107,14 @@ class BackendClient {
         return await this.sendRequest("DELETE", `files/${file_id}?ignore_error=${ignore_error}`);
     }
 
-    async suspendFile(file_id, suspend) {
-        await this.sendRequest("PATCH", `files/${file_id}?suspend=${suspend}`);
+    /**
+     *
+     * @param chatId {string}
+     * @param activeFiles Object mapping fileId -> isActive
+     * @returns {Promise<void>}
+     */
+    async setFilesActive(chatId, activeFiles) {
+        await this.sendRequest("PUT", `chats/${chatId}`, activeFiles);
     }
 
     async renameFile(file_id, name) {

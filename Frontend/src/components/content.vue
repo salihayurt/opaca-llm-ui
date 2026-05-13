@@ -490,18 +490,18 @@ export default {
             }
         },
 
-        async handleSuspendFile(fileId, suspend) {
-            await backendClient.suspendFile(fileId, suspend);
+        async handleSuspendFile(fileId, isActive) {
+            const body = {fileId: isActive}
+            await backendClient.setFilesActive(this.selectedChatId, {fileId: isActive});
             await this.$refs.sidebar.$refs.files.updateFiles();
         },
 
         async suspendAllFiles() {
             const files = await backendClient.files();
-            for (const file of Object.values(files)) {
-                if (!file.suspended) {
-                    await backendClient.suspendFile(file.file_id, true);
-                }
-            }
+            const body = Object.values(files).reduce((acc, file) => {
+                acc[file.file_id] = false;
+            }, {});
+            await backendClient.setFilesActive(this.selectedChatId, body);
             await this.$refs.sidebar.$refs.files.updateFiles();
         },
 
