@@ -46,7 +46,17 @@
                                     :data-bs-target="'#mcp-body-' + mcpServerIndex + '-' + mcpIndex"
                                     aria-expanded="false"
                                     :aria-controls="'mcp-body-' + mcpServerIndex + '-' + mcpIndex">
-                                <i class="fa fa-wrench me-3"/>
+                                <div class="position-relative d-inline-block me-3">
+                                    <i class="fa fa-wrench"/>
+                                    <span class="position-absolute top-100 start-100 p-1 rounded-circle"
+                                          :class="{
+                                              'bg-warning': mcp.approval === 'ask',
+                                              'bg-danger': mcp.approval === 'deny',
+                                              'bg-success': mcp.approval === 'allow'
+                                          }" style="outline: 2px solid var(--surface-color); transform: translate(-30%, -90%);">
+                                        <span class="visually-hidden">Approval State</span>
+                                    </span>
+                                </div>
                                 {{ mcp.name }}
                             </button>
 
@@ -274,14 +284,14 @@ export default {
 }
 
 .btn-check:checked + .btn.btn-outline-secondary.mcp-approval-ask {
-    background-color: var(--primary-color, #0d6efd);
-    border-color: var(--primary-color, #0d6efd);
+    background-color: #ffc107;
+    border-color: #ffc107;
     color: #fff;
 }
 
 .btn-check:checked + .btn.btn-outline-secondary.mcp-approval-deny {
-    background-color: var(--text-danger-color, #dc3545);
-    border-color: var(--text-danger-color, #dc3545);
+    background-color: #dc3545;
+    border-color: #dc3545;
     color: #fff;
 }
 

@@ -88,7 +88,17 @@
                                                     :data-bs-target="`#action-accordion-body-${containerId}-${agentIndex}-${actionIndex}`"
                                                     :aria-controls="`action-accordion-body-${containerId}-${agentIndex}-${actionIndex}`"
                                                     aria-expanded="false">
-                                                <i class="fa fa-wrench me-3"/>
+                                                <div class="position-relative d-inline-block me-3">
+                                                    <i class="fa fa-wrench"/>
+                                                    <span class="position-absolute top-100 start-100 p-1 rounded-circle"
+                                                          :class="{
+                                                              'bg-warning': (approvals?.[`${agentId}--${action.name}`] || 'allow') === 'ask',
+                                                              'bg-danger': (approvals?.[`${agentId}--${action.name}`] || 'allow') === 'deny',
+                                                              'bg-success': (approvals?.[`${agentId}--${action.name}`] || 'allow') === 'allow'
+                                                          }" style="outline: 2px solid var(--surface-color); transform: translate(-180%, -70%);">
+                                                        <span class="visually-hidden">Approval State</span>
+                                                    </span>
+                                                </div>
                                                 {{ action.name }}
                                             </button>
                                         </h2>
@@ -560,14 +570,14 @@ export default {
 }
 
 .btn-check:checked + .btn.btn-outline-secondary.container-approval-ask {
-    background-color: var(--primary-color, #0d6efd);
-    border-color: var(--primary-color, #0d6efd);
+    background-color: #ffc107;
+    border-color: #ffc107;
     color: #fff;
 }
 
 .btn-check:checked + .btn.btn-outline-secondary.container-approval-deny {
-    background-color: var(--text-danger-color, #dc3545);
-    border-color: var(--text-danger-color, #dc3545);
+    background-color: #dc3545;
+    border-color: #dc3545;
     color: #fff;
 }
 
