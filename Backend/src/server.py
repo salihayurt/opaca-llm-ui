@@ -226,7 +226,7 @@ async def delete_container(container_id: str, session: SessionData = Depends(han
 
 @app.get("/containers/{container_id}/approval", description="Get per-tool approvals for a specific container.", tags=["opaca"])
 async def get_container_approvals(container_id: str, session: SessionData = Depends(handle_session_http)) -> dict:
-    return session.tool_approvals.get(container_id, {})
+    return session.opaca_approvals.get(container_id, {})
 
 
 @app.patch("/containers/{container_id}/approval", description="Update tool approval for a specific tool inside a container.", tags=["opaca"])

@@ -214,6 +214,9 @@ class InternalTool(BaseModel):
     requires_code_execution: bool = False
 
 
+ToolApprovalType = Literal["ask", "deny", "allow"]
+
+
 class ScheduledTask(BaseModel):
     """
     An LLM Task scheduled for later execution, by sending the query to the LLM at a later time
@@ -299,7 +302,7 @@ class MCPTool(BaseModel):
     description: str
     inputSchema: Dict[str, Any]
     server_label: str
-    approval: Literal["ask", "deny", "allow"]
+    approval: ToolApprovalType
 
     def get_full_name(self) -> str:
         """Get the full tool name as expected by the LLM, including the server label."""
@@ -365,7 +368,7 @@ class SessionData(BaseModel):
     notifications_chats_map: Dict[int, Set[str]] = Field(default_factory=dict)
     valid_until: float = -1
     mcp_servers: Dict[str, MCPServer] = Field(default_factory=dict)
-    tool_approvals: Dict[str, Dict[str, Literal["ask", "deny", "allow"]]] = Field(default_factory=dict)
+    opaca_approvals: Dict[str, Dict[str, ToolApprovalType]] = Field(default_factory=dict)
     blocked: bool = False
     prompts: SessionPrompts | None = None
 
@@ -445,7 +448,7 @@ class SessionData(BaseModel):
             tools[server.params.server_label] = list(server.tools.values())
         return tools
 
-    async def set_mcp_tool_approval(self, server_label: str, tool_name: str, approval: Literal["ask", "deny", "allow"]):
+    async def set_mcp_tool_approval(self, server_label: str, tool_name: str, approval: ToolApprovalType):
         """Set whether a tool call should be allowed, denied, or require confirmation by the user."""
         server = self.mcp_servers.get(server_label)
         if not server:
@@ -458,16 +461,16 @@ class SessionData(BaseModel):
         
         tool.approval = approval
 
-    def get_tool_approval(self, tool_name: str) -> Literal["ask", "deny", "allow"]:
-        for container_approvals in self.tool_approvals.values():
+    def get_tool_approval(self, tool_name: str) -> ToolApprovalType:
+        for container_approvals in self.opaca_approvals.values():
             if tool_name in container_approvals:
                 return container_approvals[tool_name]
         return "allow"
 
-    def set_tool_approval(self, container_id: str, tool_name: str, approval: Literal["ask", "deny", "allow"]):
-        if container_id not in self.tool_approvals:
-            self.tool_approvals[container_id] = {}
-        self.tool_approvals[container_id][tool_name] = approval
+    def set_tool_approval(self, container_id: str, tool_name: str, approval: ToolApprovalType):
+        if container_id not in self.opaca_approvals:
+            self.opaca_approvals[container_id] = {}
+        self.opaca_approvals[container_id][tool_name] = approval
 
 
     async def add_mcp_server(self, params: Dict[str, Any]) -> bool:
@@ -608,7 +611,7 @@ class MCPCreateMessage(BaseModel):
 
 class ToolApproval(BaseModel):
     tool_name: str
-    approval: Literal["ask", "deny", "allow"]
+    approval: ToolApprovalType
 
 
 # MESSAGES SENT OR RECEIVED VIA WEBSOCKET
