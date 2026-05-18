@@ -198,7 +198,22 @@ export default {
         },
 
         async setApproval(serverLabel, toolName, approval) {
-            await backendClient.setMcpToolApproval(serverLabel, toolName, approval);
+            // Optimistically update the UI locally
+            if (this.platformMcp) {
+                for (const server in this.platformMcp) {
+                    const tool = this.platformMcp[server].find(t => t.server_label === serverLabel && t.name === toolName);
+                    if (tool) {
+                        tool.approval = approval;
+                        break;
+                    }
+                }
+            }
+
+            try {
+                await backendClient.setMcpToolApproval(serverLabel, toolName, approval);
+            } catch (err) {
+                console.error("Failed to update approval", err);
+            }
         },
 
         isValidInput(s_url, s_label) {
