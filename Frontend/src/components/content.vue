@@ -142,7 +142,7 @@
                                 type="file"
                                 ref="fileInput"
                                 class="d-none"
-                                :disabled="!this.isFinished"
+                                :disabled="!this.isChatFinished()"
                                 @change="handleFileSelection"
                                 multiple
                             />
@@ -235,6 +235,7 @@ export default {
         'container-login-required',
         'api-key-required',
         'new-notification',
+        'chat-viewed',
     ],
     setup() {
         const { isMobile } = useDevice()
@@ -337,6 +338,7 @@ export default {
         },
 
         async askChatGpt(userText, files = null) {
+            const chatId = this.selectedChatId;
             this.showExampleQuestions = false;
             this.newChat = false;
 
@@ -351,25 +353,59 @@ export default {
             await this.addChatBubble('', false, true);
             const aiBubble = this.getLastBubble();
             aiBubble.addStatusMessage('preparing', Localizer.get('chatbubble_preparing'), false);
+            this.$refs.sidebar.$refs.chats.markChatWorking(chatId, userText);
 
             // get chat response (intermediate results are streamed via websocket)
             try {
-                const result = await backendClient.query(this.selectedChatId, this.method, userText, true, 5*60*1000);
+                const result = await backendClient.query(chatId, this.method, userText, true, 5*60*1000);
 
                 // display final result
-                if (result.error) {
-                    aiBubble.setError(result.error);
-                    this.$refs.sidebar.$refs.debug.addDebugMessage(`\n${result.content}\n\nCause: ${result.error}\n`, "ERROR");
+                if (this.selectedChatId === chatId) {
+                    this.applyFinalResponse(result, this.getLastBubble());
                 }
-                aiBubble.setContent(result.content);
-                this.syncStructuredAgentDebugMessages(result.agent_messages || []);
+
+                if (this.shouldNotifyChatResponse(chatId)) {
+                    this.$emit('new-notification', {
+                        type: "ChatFinishedMessage",
+                        chat_id: chatId,
+                        content: this.createNotificationPreview(result.content),
+                    });
+                }
             } finally {
-                // always set to completed, even in case of error, e.g. timeout
-                aiBubble.toggleLoading(false);
-                this.startAutoSpeak();
-                this.scrollDownChat();
+                if (this.selectedChatId === chatId) {
+                    // always set to completed, even in case of error, e.g. timeout
+                    this.getLastBubble().toggleLoading(false);
+                    this.startAutoSpeak();
+                    this.scrollDownChat();
+                }
                 await this.$refs.sidebar.$refs.chats.updateChats();
             }
+        },
+
+        applyFinalResponse(response, aiBubble) {
+            if (!response || !aiBubble) return;
+            if (response.error) {
+                aiBubble.setError(response.error);
+                this.$refs.sidebar.$refs.debug.addDebugMessage(`\n${response.content}\n\nCause: ${response.error}\n`, "ERROR");
+            }
+            aiBubble.setContent(response.content ?? '');
+            this.syncStructuredAgentDebugMessages(response.agent_messages || []);
+        },
+
+        shouldNotifyChatResponse(chatId) {
+            return !(chatId === this.selectedChatId
+                && !document.hidden
+                && this.isMainContentVisible());
+        },
+
+        createNotificationPreview(content) {
+            const lines = (content ?? '')
+                .split(/\r?\n/)
+                .map(line => line.trim())
+                .filter(line => line.length > 0)
+                .slice(0, 3);
+            const preview = lines.join('\n');
+            return preview.length > 240 ? `${preview.substring(0, 237)}...` : preview;
         },
 
         async showInfo(message) {
@@ -535,7 +571,7 @@ export default {
             // selected chat.
             if (result.chat_id !== undefined && result.chat_id !== this.selectedChatId) {
                 return;
-            } else if (result.chat_id !== undefined && !this.messages || this.messages.length === 0) {
+            } else if (result.chat_id !== undefined && (!this.messages || this.messages.length === 0)) {
                 console.warn('No chat bubbles for streaming found.');
                 return;
             }
@@ -784,7 +820,7 @@ export default {
                         aiBubble?.addMetric(metric)
                     }
                     if (msg.error) {
-                        aiBubble.setError(msg.error);
+                        this.getLastBubble().setError(msg.error);
                     }
                 }
 
@@ -792,8 +828,9 @@ export default {
                     this.showExampleQuestions = false;
                     this.selectedChatId = chatId;
                     this.newChat = false;
-                    this.messages[this.messages.length - 1]
-                        .isLoading = true
+                    if (switchChat) {
+                        this.$emit('chat-viewed', chatId);
+                    }
                 }
 
             } catch (err) {

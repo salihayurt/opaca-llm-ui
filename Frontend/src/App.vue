@@ -135,6 +135,7 @@
             @action-confirmation-required="confirmActionDetails => handleConfirmAction(confirmActionDetails)"
             @api-key-required="apiKeyMessage => handleApiKey(apiKeyMessage)"
             @new-notification="response => createNotification(response)"
+            @chat-viewed="chatId => clearMissedResponseTab(chatId)"
             ref="content"
         />
     </div>
@@ -171,6 +172,8 @@ export default {
             selectedCategory: null,
             unreadNotifications: 0,
             pendingNotification: false,
+            missedResponseChatIds: [],
+            redFaviconCache: {},
         }
     },
     methods: {
@@ -274,16 +277,106 @@ export default {
                 this.pendingNotification = false;
                 this.unreadNotifications += 1;
             }
+            if (response.type === "ChatFinishedMessage") {
+                this.showDesktopNotification(
+                    Localizer.get('notification_chatFinished'),
+                    response.content || null,
+                    response.chat_id,
+                );
+                this.markMissedResponseTab(response.chat_id);
+            }
         },
 
-        async showDesktopNotification(text) {
-            const canShowNotification = (("Notification" in window) && (
-                Notification.permission === "granted" ||
-                Notification.permission !== "denied" && await (Notification.requestPermission() === "granted")
-            ));
-            if (canShowNotification) {
-                const notification = new Notification(text);
-                notification.onclick = (e) => { window.focus(); };
+        markMissedResponseTab(chatId) {
+            if (!chatId || this.missedResponseChatIds.includes(chatId)) return;
+            this.missedResponseChatIds = [...this.missedResponseChatIds, chatId];
+            this.updateTabNotificationFavicon();
+        },
+
+        clearMissedResponseTab(chatId = null) {
+            if (chatId) {
+                this.missedResponseChatIds = this.missedResponseChatIds.filter(id => id !== chatId);
+            } else {
+                this.missedResponseChatIds = [];
+            }
+            this.updateTabNotificationFavicon();
+        },
+
+        async updateTabNotificationFavicon() {
+            const hasMissedResponse = this.missedResponseChatIds.length > 0;
+            const icons = document.querySelectorAll('link[rel~="icon"]');
+
+            if (!hasMissedResponse) {
+                icons.forEach(icon => {
+                    if (icon.dataset.originalHref) {
+                        icon.href = icon.dataset.originalHref;
+                        delete icon.dataset.originalHref;
+                    }
+                });
+                return;
+            }
+
+            await Promise.all(Array.from(icons).map(async icon => {
+                if (!icon.dataset.originalHref) {
+                    icon.dataset.originalHref = icon.href;
+                }
+                const redHref = await this.createRedFavicon(icon.dataset.originalHref);
+                if (this.missedResponseChatIds.length > 0) {
+                    icon.href = redHref;
+                }
+            }));
+        },
+
+        createRedFavicon(sourceHref) {
+            if (this.redFaviconCache[sourceHref]) {
+                return Promise.resolve(this.redFaviconCache[sourceHref]);
+            }
+
+            return new Promise(resolve => {
+                const img = new Image();
+                img.onload = () => {
+                    const size = Math.max(img.naturalWidth, img.naturalHeight, 32);
+                    const canvas = document.createElement("canvas");
+                    canvas.width = size;
+                    canvas.height = size;
+
+                    const ctx = canvas.getContext("2d");
+                    ctx.drawImage(img, 0, 0, size, size);
+                    ctx.globalCompositeOperation = "source-atop";
+                    ctx.fillStyle = "#dc3545";
+                    ctx.fillRect(0, 0, size, size);
+
+                    const redHref = canvas.toDataURL("image/png");
+                    this.redFaviconCache[sourceHref] = redHref;
+                    resolve(redHref);
+                };
+                img.onerror = () => resolve(sourceHref);
+                img.src = sourceHref;
+            });
+        },
+
+        handleVisibilityChange() {
+            if (document.hidden) return;
+
+            const content = this.$refs.content;
+            if (content?.selectedChatId && content.isMainContentVisible()) {
+                this.clearMissedResponseTab(content.selectedChatId);
+            }
+        },
+
+        async showDesktopNotification(title, body = null, chatId = null) {
+            if (!("Notification" in window)) return;
+            const permission = Notification.permission === "default"
+                ? await Notification.requestPermission()
+                : Notification.permission;
+            if (permission === "granted") {
+                const notification = new Notification(title, body ? {body: body} : undefined);
+                notification.onclick = async () => {
+                    window.focus();
+                    if (chatId) {
+                        await this.handleOpenNotificationChat(chatId);
+                    }
+                };
             }
         },
 
@@ -371,12 +464,19 @@ export default {
                 }
             );
         },
+
+        async handleOpenNotificationChat(chatId) {
+            await this.$refs.content.loadHistory(chatId);
+            this.$refs.content.$refs.textInputRef?.focus();
+            this.clearMissedResponseTab(chatId);
+        },
     },
 
     async mounted() {
         if (conf.ColorScheme !== "system") {
             this.setTheme(conf.ColorScheme);
         }
+        document.addEventListener('visibilitychange', this.handleVisibilityChange);
 
         // prevent options dropdown menu from closing once anything in it is clicked
         document.getElementById('options-menu')?.addEventListener('click', e => {
@@ -403,6 +503,11 @@ export default {
         await sidebars.questions.loadPrompts();
         // open permanent websocket connection to backend for "push notifications" to the UI
         this.$refs.content.connectWebsocket();
+    },
+    beforeUnmount() {
+        document.removeEventListener('visibilitychange', this.handleVisibilityChange);
+        this.missedResponseChatIds = [];
+        this.updateTabNotificationFavicon();
     }
 }
 </script>

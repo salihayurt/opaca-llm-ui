@@ -13,13 +13,17 @@
         @keyup.esc="e => this.handleCancelName(e)"
         disabled
     />
+    <i v-if="isWorking()"
+       class="fa fa-spin fa-spinner chat-menu-button chat-status"
+       :title="Localizer.get('chats_working')"
+    />
     <i class="fa fa-edit ms-auto chat-menu-button"
-       :class="{'chat-disabled': !this.isFinished}"
+       :class="{'chat-disabled': !this.canModify()}"
        @click.stop="this.rename()"
        :title="Localizer.get('chats_edit')"
     />
     <i class="fa fa-remove chat-menu-button"
-       :class="{'chat-disabled': !this.isFinished}"
+       :class="{'chat-disabled': !this.canModify()}"
        @click.stop="this.delete()"
        :title="Localizer.get('chats_delete')"
     />
@@ -58,7 +62,7 @@ export default {
         },
 
         rename() {
-            if (!this.isFinished) return;
+            if (!this.canModify()) return;
             this.isEditingName = true;
             const input = this.$refs.nameInput;
             input.disabled = false;
@@ -67,10 +71,18 @@ export default {
         },
 
         delete() {
-            if (!this.isFinished) return;
+            if (!this.canModify()) return;
             if (confirm(Localizer.get("chats_delete_confirm"))) {
                 this.$emit('delete-chat', this.chatId);
             }
+        },
+
+        canModify() {
+            return this.isFinished && this.chat?.is_finished !== false;
+        },
+
+        isWorking() {
+            return this.chat?.is_finished === false;
         },
 
         handleSubmitName(event) {
@@ -197,5 +209,12 @@ export default {
 .chat-menu-button:hover {
     background-color: var(--input-color);
     color: var(--text-danger-color);
+}
+
+.chat-status,
+.chat-status:hover {
+    background-color: transparent;
+    color: var(--text-primary-color);
+    cursor: default;
 }
 </style>

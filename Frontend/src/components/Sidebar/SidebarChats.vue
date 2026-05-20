@@ -98,6 +98,26 @@ export default {
             }
         },
 
+        markChatWorking(chatId, query = "") {
+            const index = this.chats.findIndex(chat => chat.chat_id === chatId);
+            const name = query.length > 32 ? `${query.substring(0, 32)}...` : query;
+
+            if (index >= 0) {
+                this.chats[index] = {
+                    ...this.chats[index],
+                    is_finished: false,
+                };
+                this.chats = [...this.chats];
+                return;
+            }
+
+            this.chats = [{
+                chat_id: chatId,
+                name: name || chatId,
+                is_finished: false,
+            }, ...this.chats];
+        },
+
         gotoSearchResult(chatId, messageId) {
             this.isSearching = false;
             this.$emit('goto-search-result', chatId, messageId)
