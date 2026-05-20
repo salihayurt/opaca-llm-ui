@@ -135,7 +135,7 @@
             @action-confirmation-required="confirmActionDetails => handleConfirmAction(confirmActionDetails)"
             @api-key-required="apiKeyMessage => handleApiKey(apiKeyMessage)"
             @new-notification="response => createNotification(response)"
-            @chat-viewed="chatId => clearMissedResponseTab(chatId)"
+            @chat-viewed="chatId => clearMissedChatResponse(chatId)"
             ref="content"
         />
     </div>
@@ -153,13 +153,14 @@ import OptionsSelect from "./components/OptionsSelect.vue";
 import {setColorTheme} from './ColorThemes.js';
 import CookieBanner from './components/CookieBanner.vue';
 import InputDialogue from './components/InputDialogue.vue';
+import {clearMissedChatResponse, markMissedChatResponse, showDesktopNotification} from "./browserNotifications.js";
 
 export default {
     name: 'App',
     components: {OptionsSelect, MainContent, CookieBanner, Notifications, InputDialogue},
     setup() {
         const { isMobile } = useDevice();
-        return { conf, Localizer, isMobile };
+        return { conf, Localizer, isMobile, clearMissedChatResponse };
     },
     data() {
         return {
@@ -172,8 +173,6 @@ export default {
             selectedCategory: null,
             unreadNotifications: 0,
             pendingNotification: false,
-            missedResponseChatIds: [],
-            redFaviconCache: {},
         }
     },
     methods: {
@@ -273,86 +272,20 @@ export default {
             }
             if (response.type === "PushMessage")  {
                 notificationArea.addNotificationBubble(response);
-                this.showDesktopNotification(response.content);
+                showDesktopNotification(response.content);
                 this.pendingNotification = false;
                 this.unreadNotifications += 1;
             }
             if (response.type === "ChatFinishedMessage") {
-                this.showDesktopNotification(
+                showDesktopNotification(
                     Localizer.get('notification_chatFinished'),
-                    response.content || null,
-                    response.chat_id,
+                    {
+                        body: response.content || null,
+                        onClick: async () => this.handleOpenNotificationChat(response.chat_id),
+                    },
                 );
-                this.markMissedResponseTab(response.chat_id);
+                markMissedChatResponse(response.chat_id);
             }
-        },
-
-        markMissedResponseTab(chatId) {
-            if (!chatId || this.missedResponseChatIds.includes(chatId)) return;
-            this.missedResponseChatIds = [...this.missedResponseChatIds, chatId];
-            this.updateTabNotificationFavicon();
-        },
-
-        clearMissedResponseTab(chatId = null) {
-            if (chatId) {
-                this.missedResponseChatIds = this.missedResponseChatIds.filter(id => id !== chatId);
-            } else {
-                this.missedResponseChatIds = [];
-            }
-            this.updateTabNotificationFavicon();
-        },
-
-        async updateTabNotificationFavicon() {
-            const hasMissedResponse = this.missedResponseChatIds.length > 0;
-            const icons = document.querySelectorAll('link[rel~="icon"]');
-
-            if (!hasMissedResponse) {
-                icons.forEach(icon => {
-                    if (icon.dataset.originalHref) {
-                        icon.href = icon.dataset.originalHref;
-                        delete icon.dataset.originalHref;
-                    }
-                });
-                return;
-            }
-
-            await Promise.all(Array.from(icons).map(async icon => {
-                if (!icon.dataset.originalHref) {
-                    icon.dataset.originalHref = icon.href;
-                }
-                const redHref = await this.createRedFavicon(icon.dataset.originalHref);
-                if (this.missedResponseChatIds.length > 0) {
-                    icon.href = redHref;
-                }
-            }));
-        },
-
-        createRedFavicon(sourceHref) {
-            if (this.redFaviconCache[sourceHref]) {
-                return Promise.resolve(this.redFaviconCache[sourceHref]);
-            }
-
-            return new Promise(resolve => {
-                const img = new Image();
-                img.onload = () => {
-                    const size = Math.max(img.naturalWidth, img.naturalHeight, 32);
-                    const canvas = document.createElement("canvas");
-                    canvas.width = size;
-                    canvas.height = size;
-
-                    const ctx = canvas.getContext("2d");
-                    ctx.drawImage(img, 0, 0, size, size);
-                    ctx.globalCompositeOperation = "source-atop";
-                    ctx.fillStyle = "#dc3545";
-                    ctx.fillRect(0, 0, size, size);
-
-                    const redHref = canvas.toDataURL("image/png");
-                    this.redFaviconCache[sourceHref] = redHref;
-                    resolve(redHref);
-                };
-                img.onerror = () => resolve(sourceHref);
-                img.src = sourceHref;
-            });
         },
 
         handleVisibilityChange() {
@@ -360,23 +293,7 @@ export default {
 
             const content = this.$refs.content;
             if (content?.selectedChatId && content.isMainContentVisible()) {
-                this.clearMissedResponseTab(content.selectedChatId);
-            }
-        },
-
-        async showDesktopNotification(title, body = null, chatId = null) {
-            if (!("Notification" in window)) return;
-            const permission = Notification.permission === "default"
-                ? await Notification.requestPermission()
-                : Notification.permission;
-            if (permission === "granted") {
-                const notification = new Notification(title, body ? {body: body} : undefined);
-                notification.onclick = async () => {
-                    window.focus();
-                    if (chatId) {
-                        await this.handleOpenNotificationChat(chatId);
-                    }
-                };
+                clearMissedChatResponse(content.selectedChatId);
             }
         },
 
@@ -468,7 +385,7 @@ export default {
         async handleOpenNotificationChat(chatId) {
             await this.$refs.content.loadHistory(chatId);
             this.$refs.content.$refs.textInputRef?.focus();
-            this.clearMissedResponseTab(chatId);
+            clearMissedChatResponse(chatId);
         },
     },
 
@@ -506,8 +423,7 @@ export default {
     },
     beforeUnmount() {
         document.removeEventListener('visibilitychange', this.handleVisibilityChange);
-        this.missedResponseChatIds = [];
-        this.updateTabNotificationFavicon();
+        clearMissedChatResponse();
     }
 }
 </script>
