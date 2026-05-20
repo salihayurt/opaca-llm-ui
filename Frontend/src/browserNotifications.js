@@ -1,5 +1,8 @@
 const missedResponseChatIds = new Set();
-const redFaviconCache = {};
+const notificationFavicons = {
+    light: "/sage-logo-small-light-notification.png",
+    dark: "/sage-logo-small-dark-notification.png",
+};
 
 export async function showDesktopNotification(title, {body = null, onClick = null, focusWindowOnClick = true} = {}) {
     if (typeof window === "undefined" || !("Notification" in window)) return null;
@@ -24,7 +27,7 @@ export async function showDesktopNotification(title, {body = null, onClick = nul
 }
 
 export function markMissedChatResponse(chatId) {
-    if (!chatId || missedResponseChatIds.has(chatId)) return;
+    if (!chatId) return;
     missedResponseChatIds.add(chatId);
     updateTabNotificationFavicon();
 }
@@ -38,7 +41,7 @@ export function clearMissedChatResponse(chatId = null) {
     updateTabNotificationFavicon();
 }
 
-async function updateTabNotificationFavicon() {
+function updateTabNotificationFavicon() {
     if (typeof document === "undefined") return;
 
     const hasMissedResponse = missedResponseChatIds.size > 0;
@@ -54,41 +57,22 @@ async function updateTabNotificationFavicon() {
         return;
     }
 
-    await Promise.all(Array.from(icons).map(async icon => {
+    icons.forEach(icon => {
         if (!icon.dataset.originalHref) {
             icon.dataset.originalHref = icon.href;
         }
-        const redHref = await createRedFavicon(icon.dataset.originalHref);
-        if (missedResponseChatIds.size > 0) {
-            icon.href = redHref;
-        }
-    }));
+        icon.href = getNotificationFavicon(icon);
+    });
 }
 
-function createRedFavicon(sourceHref) {
-    if (redFaviconCache[sourceHref]) {
-        return Promise.resolve(redFaviconCache[sourceHref]);
-    }
+function getNotificationFavicon(icon) {
+    const media = icon?.media?.toLowerCase() ?? "";
+    if (media.includes("prefers-color-scheme: dark")) return notificationFavicons.dark;
+    if (media.includes("prefers-color-scheme: light")) return notificationFavicons.light;
+    return isBrowserDarkTheme() ? notificationFavicons.dark : notificationFavicons.light;
+}
 
-    return new Promise(resolve => {
-        const img = new Image();
-        img.onload = () => {
-            const size = Math.max(img.naturalWidth, img.naturalHeight, 32);
-            const canvas = document.createElement("canvas");
-            canvas.width = size;
-            canvas.height = size;
-
-            const ctx = canvas.getContext("2d");
-            ctx.drawImage(img, 0, 0, size, size);
-            ctx.globalCompositeOperation = "source-atop";
-            ctx.fillStyle = "#dc3545";
-            ctx.fillRect(0, 0, size, size);
-
-            const redHref = canvas.toDataURL("image/png");
-            redFaviconCache[sourceHref] = redHref;
-            resolve(redHref);
-        };
-        img.onerror = () => resolve(sourceHref);
-        img.src = sourceHref;
-    });
+function isBrowserDarkTheme() {
+    return typeof window !== "undefined"
+        && window.matchMedia("(prefers-color-scheme: dark)").matches;
 }
