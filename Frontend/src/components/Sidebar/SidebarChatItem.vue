@@ -11,7 +11,7 @@
         @change="e => this.handleSubmitName(e)"
         @blur="e => this.handleCancelName(e)"
         @keyup.esc="e => this.handleCancelName(e)"
-        disabled
+        :disabled="!isEditingName"
     />
     <i v-if="isWorking()"
        class="fa fa-spin fa-spinner chat-menu-button chat-status"
@@ -61,11 +61,11 @@ export default {
             this.$emit('select-chat', this.chatId);
         },
 
-        rename() {
+        async rename() {
             if (!this.canModify()) return;
             this.isEditingName = true;
+            await this.$nextTick();
             const input = this.$refs.nameInput;
-            input.disabled = false;
             input.focus();
             input.select();
         },
@@ -86,24 +86,24 @@ export default {
         },
 
         handleSubmitName(event) {
+            if (!this.isEditingName) return;
             event.preventDefault();
             event.stopPropagation();
             this.isEditingName = false;
             const name = this.nameInput;
             this.$emit('rename-chat', this.chatId, this.nameInput);
             const input = this.$refs.nameInput;
-            input.disabled = true;
             input.scrollLeft = 0;
             input.blur();
-            this.nameInput = name; // reset input after blur triggered cancel
+            this.nameInput = name;
         },
 
         handleCancelName(event) {
+            if (!this.isEditingName) return;
             event.preventDefault();
             event.stopPropagation();
             this.isEditingName = false;
             const input = this.$refs.nameInput;
-            input.disabled = true;
             input.blur();
             this.nameInput = this.chat.name ? this.chat.name : this.chatId;
         },
@@ -119,6 +119,7 @@ export default {
     },
     watch: {
         chat() {
+            if (this.isEditingName) return;
             this.nameInput = this.chat.name ? this.chat.name : this.chatId;
         }
     }
