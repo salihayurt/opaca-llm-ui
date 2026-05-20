@@ -193,16 +193,15 @@ export default {
     methods: {
         async setApproval(containerId, agentName, actionName, approval) {
             const toolName = `${agentName}--${actionName}`;
-            
-            // Optimistically update the UI locally
-            const container = this.platformContainers.find(c => c.containerId === containerId);
-            if (container) {
-                if (!container.approvals) container.approvals = {};
-                container.approvals[toolName] = approval;
-            }
 
             try {
                 await backendClient.setContainerApproval(containerId, toolName, approval);
+
+                const container = this.platformContainers.find(c => c.containerId === containerId);
+                if (container) {
+                    if (!container.approvals) container.approvals = {};
+                    container.approvals[toolName] = approval;
+                }
             } catch (err) {
                 console.error("Failed to update approval", err);
             }
