@@ -111,7 +111,10 @@ class SimpleMethod(AbstractMethod):
 
                 tool.id = self.next_tool_id(result)
                 await self.send_to_websocket(ToolCallMessage(id=tool.id, name=tool.name, args=tool.args, agent="assistant"))
-                tool_call = await self.invoke_tool(tool.name, tool.args, tool.id)
+                if tool.type == "mcp":
+                    tool_call = await self.invoke_mcp_tool(tool.name, tool.args, tool.id)
+                else:
+                    tool_call = await self.invoke_opaca_tool(tool.name, tool.args, tool.id)
                 response.agent_messages.append(AgentMessage(
                     agent="assistant",
                     content=f"\nThe result of this step was: {tool_call.result}",
@@ -134,6 +137,18 @@ class SimpleMethod(AbstractMethod):
             actions = await self.session.opaca_client.get_actions_simple()
             if self.internal_tools:
                 actions.update(self.internal_tools.get_internal_tools_simple())
+            if self.session.mcp_servers:
+                for server_label, server in self.session.mcp_servers.items():
+                    server_actions = []
+                    for tool in server.tools.values():
+                        if tool.approval != 'deny':
+                            server_actions.append({
+                                "action": tool.name,
+                                "description": tool.description,
+                                "parameters": tool.inputSchema
+                            })
+                    if server_actions:
+                        actions[server_label] = server_actions
             return actions
         except:
             return "(No services, not connected yet.)"
@@ -142,7 +157,9 @@ class SimpleMethod(AbstractMethod):
         try:
             d = json.loads(llm_response.strip("`json\n")) # strip markdown, if included
             if type(d) is dict:
-                return ToolCall(id="0", type="opaca", name=f'{d["agentId"]}--{d["action"]}', args=d["params"])
+                agent_id = d.get("agentId")
+                tool_type = "mcp" if self.session.mcp_servers and agent_id in self.session.mcp_servers else "opaca"
+                return ToolCall(id="0", type=tool_type, name=f'{agent_id}--{d["action"]}', args=d["params"])
         except (json.JSONDecodeError, KeyError):
             pass
         return None

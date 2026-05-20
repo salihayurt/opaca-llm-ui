@@ -132,7 +132,7 @@ class ToolLLMMethod(AbstractMethod):
             tasks = []
             for i, call in enumerate(result.tools):
                 if call.type == "opaca":
-                    tasks.append(self.invoke_tool(call.name, call.args, call.id))
+                    tasks.append(self.invoke_opaca_tool(call.name, call.args, call.id))
                 elif call.type == "mcp":
                     tasks.append(self.invoke_mcp_tool(call.name, call.args, call.id))
 

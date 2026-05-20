@@ -231,7 +231,7 @@ class AbstractMethod(ABC):
             await self.session.websocket_send(message)
 
 
-    async def invoke_tool(self, tool_name: str, tool_args: dict, tool_id: str, login_attempt_retry: bool = False) -> ToolCall:
+    async def invoke_opaca_tool(self, tool_name: str, tool_args: dict, tool_id: str, login_attempt_retry: bool = False) -> ToolCall:
         """
         Invoke OPACA action matching the given tool. If invoke fails due to required login, attempt Login (via websocket callback)
         and try again. In any case returns a ToolCall, where "result" can be error message.
@@ -370,7 +370,7 @@ class AbstractMethod(ABC):
         async with self.session.opaca_client.login_lock:
             # might already be logged in on lock-release if two actions of same container were called in parallel
             if container_id in self.session.opaca_client.logged_in_containers:
-                return await self.invoke_tool(tool_name, tool_args, tool_id, True)
+                return await self.invoke_opaca_tool(tool_name, tool_args, tool_id, True)
             while True:
                 # Get credentials from user
                 await self.session.websocket_send(ContainerLoginNotification(
@@ -390,7 +390,7 @@ class AbstractMethod(ABC):
                     login_attempt_retry = True
 
         # login succeeded (or not checked by container) -> try to invoke the tool again
-        res = await self.invoke_tool(tool_name, tool_args, tool_id, True)
+        res = await self.invoke_opaca_tool(tool_name, tool_args, tool_id, True)
 
         # Schedule a deferred logout based on the user-provided timeout
         asyncio.create_task(self.session.opaca_client.deferred_container_logout(container_id, response.timeout))
