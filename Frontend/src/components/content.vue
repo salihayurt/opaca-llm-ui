@@ -367,6 +367,7 @@ export default {
                         type: "ChatFinishedMessage",
                         chat_id: chatId,
                         content: this.createNotificationPreview(result.content),
+                        show_system_notification: this.shouldShowSystemChatNotification(),
                     });
                 }
             } finally {
@@ -393,6 +394,10 @@ export default {
             return !(chatId === this.selectedChatId
                 && !document.hidden
                 && this.isMainContentVisible());
+        },
+
+        shouldShowSystemChatNotification() {
+            return document.hidden || !document.hasFocus();
         },
 
         createNotificationPreview(content) {

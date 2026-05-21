@@ -277,13 +277,15 @@ export default {
                 this.unreadNotifications += 1;
             }
             if (response.type === "ChatFinishedMessage") {
-                showDesktopNotification(
-                    Localizer.get('notification_chatFinished'),
-                    {
-                        body: response.content || null,
-                        onClick: async () => this.handleOpenNotificationChat(response.chat_id),
-                    },
-                );
+                if (response.show_system_notification) {
+                    showDesktopNotification(
+                        Localizer.get('notification_chatFinished'),
+                        {
+                            body: response.content || null,
+                            onClick: async () => this.handleOpenNotificationChat(response.chat_id),
+                        },
+                    );
+                }
                 markMissedChatResponse(response.chat_id);
             }
         },
