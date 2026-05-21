@@ -44,7 +44,6 @@
     <div v-for="chat in chats" :key="chat.chat_id">
         <SidebarChatItem
             :selected-chat-id="this.selectedChatId"
-            :is-finished="this.isFinished"
             :chat-id="chat.chat_id"
             :chat="chat"
             :has-missed-response="isChatMissed(chat.chat_id)"
@@ -68,7 +67,6 @@ export default {
     components: {SearchChatsOverlay, SidebarChatItem},
     props: {
         selectedChatId: String,
-        isFinished: Boolean,
     },
     setup() {
         const {isMobile} = useDevice();

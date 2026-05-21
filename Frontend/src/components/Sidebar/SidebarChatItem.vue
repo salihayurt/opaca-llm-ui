@@ -1,6 +1,6 @@
 <template>
 <div class="chat align-items-center"
-     :class="{'chat-selected': this.selectedChatId === chatId/*, 'chat-disabled': !this.isFinished*/}"
+     :class="{'chat-selected': this.selectedChatId === chatId}"
      @click="this.select()" >
     <input
         class="chat-name"
@@ -41,7 +41,6 @@ export default {
     name: 'SidebarChatItem',
     props: {
         selectedChatId: String,
-        isFinished: Boolean,
         chatId: String,
         chat: Object,
         hasMissedResponse: Boolean,
@@ -62,7 +61,6 @@ export default {
     },
     methods: {
         select() {
-            // if (!this.isFinished) return;
             this.$emit('select-chat', this.chatId);
         },
 
@@ -83,7 +81,7 @@ export default {
         },
 
         canModify() {
-            return this.isFinished && this.chat?.is_finished !== false;
+            return this.chat?.is_finished !== false;
         },
 
         isWorking() {

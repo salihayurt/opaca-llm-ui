@@ -24,7 +24,6 @@
             :language="language"
             :connected="connected"
             :selected-chat-id="selectedChatId"
-            :is-finished="this.isChatFinished()"
             ref="sidebar"
             @select-question="question => this.handleSelectQuestion(question)"
             @select-category="category => this.handleSelectCategory(category)"
