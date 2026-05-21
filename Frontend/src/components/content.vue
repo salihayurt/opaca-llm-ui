@@ -281,8 +281,6 @@ export default {
                 // Clear files list after sending
                 this.selectedFiles = [];
 
-                // update chats list
-                await this.$refs.sidebar.$refs.chats.updateChats();
             }
         },
 
@@ -353,7 +351,7 @@ export default {
             await this.addChatBubble('', false, true);
             const aiBubble = this.getLastBubble();
             aiBubble.addStatusMessage('preparing', Localizer.get('chatbubble_preparing'), false);
-            this.$refs.sidebar.$refs.chats.markChatWorking(chatId, userText);
+            this.$refs.sidebar.$refs.chats.clearChatMissed(chatId);
 
             // get chat response (intermediate results are streamed via websocket)
             try {
@@ -379,7 +377,6 @@ export default {
                     this.startAutoSpeak();
                     this.scrollDownChat();
                 }
-                await this.$refs.sidebar.$refs.chats.updateChats();
             }
         },
 

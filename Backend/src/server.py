@@ -311,6 +311,7 @@ async def query_chat(method: str, chat_id: str, message: QueryRequest, session: 
         response.make_error_response(e)
     finally:
         chat.is_finished = True
+        await session.websocket_send(ReloadChatsMessage())
         return response
 
 
