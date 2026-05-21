@@ -47,6 +47,7 @@
             :is-finished="this.isFinished"
             :chat-id="chat.chat_id"
             :chat="chat"
+            :has-missed-response="isChatMissed(chat.chat_id)"
             @select-chat="chatId => this.$emit('select-chat', chatId)"
             @delete-chat="chatId => this.$emit('delete-chat', chatId)"
             @rename-chat="(chatId, name) => this.$emit('rename-chat', chatId, name)"
@@ -84,6 +85,7 @@ export default {
     data() {
         return {
             chats: [],
+            missedResponseChatIds: [],
             showChatMenu: false,
             isSearching: false,
         };
@@ -99,6 +101,7 @@ export default {
         },
 
         markChatWorking(chatId, query = "") {
+            this.clearChatMissed(chatId);
             const index = this.chats.findIndex(chat => chat.chat_id === chatId);
             const name = query.length > 32 ? `${query.substring(0, 32)}...` : query;
 
@@ -116,6 +119,23 @@ export default {
                 name: name || chatId,
                 is_finished: false,
             }, ...this.chats];
+        },
+
+        markChatMissed(chatId) {
+            if (!chatId || this.missedResponseChatIds.includes(chatId)) return;
+            this.missedResponseChatIds = [...this.missedResponseChatIds, chatId];
+        },
+
+        clearChatMissed(chatId = null) {
+            if (chatId) {
+                this.missedResponseChatIds = this.missedResponseChatIds.filter(id => id !== chatId);
+            } else {
+                this.missedResponseChatIds = [];
+            }
+        },
+
+        isChatMissed(chatId) {
+            return this.missedResponseChatIds.includes(chatId);
         },
 
         gotoSearchResult(chatId, messageId) {

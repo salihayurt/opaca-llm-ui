@@ -294,6 +294,7 @@ export default {
             const content = this.$refs.content;
             if (content?.selectedChatId && content.isMainContentVisible()) {
                 clearMissedChatResponse(content.selectedChatId);
+                content.clearMissedChatResponseIndicator(content.selectedChatId);
             }
         },
 

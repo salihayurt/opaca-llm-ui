@@ -17,6 +17,10 @@
        class="fa fa-spin fa-spinner chat-menu-button chat-status"
        :title="Localizer.get('chats_working')"
     />
+    <i v-else-if="hasMissedResponse"
+       class="fa fa-circle-exclamation chat-menu-button chat-status chat-status-ready"
+       :title="Localizer.get('chats_responseReady')"
+    />
     <i class="fa fa-edit ms-auto chat-menu-button"
        :class="{'chat-disabled': !this.canModify()}"
        @click.stop="this.rename()"
@@ -40,6 +44,7 @@ export default {
         isFinished: Boolean,
         chatId: String,
         chat: Object,
+        hasMissedResponse: Boolean,
     },
     emits: [
         'select-chat',
@@ -217,5 +222,10 @@ export default {
     background-color: transparent;
     color: var(--text-primary-color);
     cursor: default;
+}
+
+.chat-status-ready,
+.chat-status-ready:hover {
+    color: var(--primary-color);
 }
 </style>

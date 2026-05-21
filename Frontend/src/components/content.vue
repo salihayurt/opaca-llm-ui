@@ -365,6 +365,7 @@ export default {
                 }
 
                 if (this.shouldNotifyChatResponse(chatId)) {
+                    this.$refs.sidebar.$refs.chats.markChatMissed(chatId);
                     this.$emit('new-notification', {
                         type: "ChatFinishedMessage",
                         chat_id: chatId,
@@ -829,6 +830,7 @@ export default {
                     this.selectedChatId = chatId;
                     this.newChat = false;
                     if (switchChat) {
+                        this.clearMissedChatResponseIndicator(chatId);
                         this.$emit('chat-viewed', chatId);
                     }
                 }
@@ -858,6 +860,10 @@ export default {
         async handleSelectChat(chatId) {
             await this.loadHistory(chatId);
             this.$refs.textInputRef.focus();
+        },
+
+        clearMissedChatResponseIndicator(chatId = null) {
+            this.$refs.sidebar.$refs.chats.clearChatMissed(chatId);
         },
 
         async handleDeleteChat(chatId) {
