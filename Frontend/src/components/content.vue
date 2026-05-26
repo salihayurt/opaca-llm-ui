@@ -31,7 +31,7 @@
             @select-chat="chatId => this.handleSelectChat(chatId)"
             @delete-chat="chatId => this.handleDeleteChat(chatId)"
             @rename-chat="(chatId, newName) => this.handleRenameChat(chatId, newName)"
-            @new-chat="() => {this.suspendAllFiles(); this.startNewChat()}"
+            @new-chat="() => this.startNewChat()"
             @delete-file="fileId => this.handleDeleteFile(fileId)"
             @suspend-file="(fileId, suspend) => this.handleSuspendFile(fileId, suspend)"
             @view-file="openViewer"
@@ -142,7 +142,7 @@
                                 type="file"
                                 ref="fileInput"
                                 class="d-none"
-                                :disabled="!this.isFinished"
+                                :disabled="!this.isFinished"s
                                 @change="handleFileSelection"
                                 multiple
                             />
@@ -492,15 +492,6 @@ export default {
 
         async handleSuspendFile(fileId, isActive) {
             const body = {fileId: isActive}
-            await backendClient.setFilesActive(this.selectedChatId, {fileId: isActive});
-            await this.$refs.sidebar.$refs.files.updateFiles();
-        },
-
-        async suspendAllFiles() {
-            const files = await backendClient.files();
-            const body = Object.values(files).reduce((acc, file) => {
-                acc[file.file_id] = false;
-            }, {});
             await backendClient.setFilesActive(this.selectedChatId, body);
             await this.$refs.sidebar.$refs.files.updateFiles();
         },
