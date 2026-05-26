@@ -310,12 +310,16 @@ async def query_chat(method: str, chat_id: str, message: QueryRequest, session: 
 
 
 @app.put("/chats/{chat_id}", description="Update a chat's name.", tags=["chat"])
-async def update_chat(chat_id: str, new_name: str = None, active_files: Dict[str, bool] = None, session: SessionData = Depends(handle_session_http)) -> None:
+async def update_chat(chat_id: str, new_name: str | None = None, active_files: Dict[str, bool] | None = None, session: SessionData = Depends(handle_session_http)) -> None:
     chat = session.get_or_create_chat(chat_id)
+
     if new_name is not None:
         chat.name = new_name
+
     if active_files is not None:
-        chat.active_files.update(active_files)
+        chat.active_files -= {file_id for file_id, is_active in active_files.items() if not is_active}
+        chat.active_files |= {file_id for file_id, is_active in active_files.items() if is_active}
+
     chat.update_modified()
 
 
@@ -429,25 +433,32 @@ async def upload_files(files: List[UploadFile], session: SessionData = Depends(h
 async def delete_file(file_id: str, ignore_error: bool = False, session: SessionData = Depends(handle_session_http)) -> bool:
     files = session.uploaded_files
 
-    if file_id in files:
-        delete_file_from_disk(session.session_id, file_id)
-        result = await delete_file_from_all_clients(session, file_id, ignore_error)
-        return result
+    if file_id not in files:
+        return False
 
-    return False
+    # remove from all chats
+    for chat in session.chats.values():
+        if file_id in chat.active_files:
+            chat.active_files.remove(file_id)
+
+    delete_file_from_disk(session.session_id, file_id)
+    return await delete_file_from_all_clients(session, file_id, ignore_error)
+
+
 
 
 @app.patch("/files/{file_id}", description="Mark a file as suspended or unsuspended.", tags=["files"])
-async def update_file(file_id: str, name: str = None, session: SessionData = Depends(handle_session_http)) -> bool:
+async def update_file(file_id: str, name: str | None = None, session: SessionData = Depends(handle_session_http)) -> bool:
     files = session.uploaded_files
 
-    if file_id in files:
-        file = files[file_id]
-        if name is not None:
-            rename_file(file, name)
-        return True
+    if file_id not in files:
+        return False
 
-    return False
+    if name is not None:
+        rename_file(files[file_id], name)
+
+    return True
+
 
 
 @app.get("/files/{file_id}/view", description="Serve a previously uploaded file for preview.", tags=["files"])

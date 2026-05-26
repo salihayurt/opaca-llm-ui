@@ -30,7 +30,7 @@ async def upload_files(session: SessionData, chat: Chat, model: str):
     # Upload all files that haven't been uploaded to this host
     for file_id, file_data in session.uploaded_files.items():
         # Skip suspended files
-        if not chat.active_files.get(file_id):
+        if file_id not in chat.active_files:
             continue
 
         # Check if the selected host supports file upload
@@ -66,11 +66,11 @@ async def upload_files(session: SessionData, chat: Chat, model: str):
 
     parts = []
     for file_id, file_data in session.uploaded_files.items():
-        if not chat.active_files.get(file_id) or (host not in filedata.host_ids):
+        if (file_id not in chat.active_files) or (host not in file_data.host_ids):
             continue
 
-        if is_image(filedata.file_name) and model_supports_vision:
-            parts.append({"type": "input_image", "file_id": filedata.host_ids[host]})
+        if is_image(file_data.file_name) and model_supports_vision:
+            parts.append({"type": "input_image", "file_id": file_data.host_ids[host]})
         else:
             parts.append({"type": "input_file", "file_id": filedata.host_ids[host]})
 
