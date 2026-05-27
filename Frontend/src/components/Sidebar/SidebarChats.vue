@@ -68,6 +68,7 @@ export default {
     props: {
         selectedChatId: String,
         isFinished: Boolean,
+        chats: Array,
     },
     setup() {
         const {isMobile} = useDevice();
@@ -80,22 +81,17 @@ export default {
         'new-chat',
         'goto-search-result',
         'delete-all-chats',
+        'update-chats',
     ],
     data() {
         return {
-            chats: [],
             showChatMenu: false,
             isSearching: false,
         };
     },
     methods: {
         async updateChats() {
-            try {
-                this.chats = await backendClient.chats();
-            } catch (error) {
-                console.error(error);
-                this.chats = [];
-            }
+            this.$emit('update-chats');
         },
 
         gotoSearchResult(chatId, messageId) {

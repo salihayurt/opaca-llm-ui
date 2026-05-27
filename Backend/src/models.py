@@ -169,7 +169,6 @@ class OpacaFile(BaseModel):
         content_type: MIME type of the file
         file_name: The absolute path to the file
         host_ids: IDs assigned by each host the file has been uploaded to
-        suspended: Whether the file should be excluded from future requests
     """
     file_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     content_type: str

@@ -33,7 +33,6 @@
             @rename-chat="(chatId, newName) => this.handleRenameChat(chatId, newName)"
             @new-chat="() => this.startNewChat()"
             @delete-file="fileId => this.handleDeleteFile(fileId)"
-            @suspend-file="(fileId, suspend) => this.handleSuspendFile(fileId, suspend)"
             @view-file="openViewer"
             @rename-file="handleRenameFile"
             @goto-search-result="(chatId, messageId) => this.gotoSearchResult(chatId, messageId)"
@@ -488,12 +487,6 @@ export default {
             } else {
                 await this.$refs.sidebar.$refs.files.updateFiles();
             }
-        },
-
-        async handleSuspendFile(fileId, isActive) {
-            const body = {fileId: isActive}
-            await backendClient.setFilesActive(this.selectedChatId, body);
-            await this.$refs.sidebar.$refs.files.updateFiles();
         },
 
         async handleRenameFile(fileId, newName) {

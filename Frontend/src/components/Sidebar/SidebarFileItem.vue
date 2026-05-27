@@ -19,7 +19,7 @@
             'ms-auto',
             'file-menu-button'
             ]"
-           @click.stop="this.suspendFile()"
+           @click.stop="this.activateFile()"
            :title="Localizer.get('files_include')"
         />
         <i class="fa fa-pen-to-square file-menu-button"
@@ -37,6 +37,7 @@
 import Localizer from "../../Localizer.js";
 import config from "../../../config.js";
 import {nextTick} from "vue";
+import backendClient from "../../utils.js";
 
 const BACKEND_ADDRESS = config.BackendAddress;
 
@@ -45,10 +46,10 @@ export default {
     props: {
         fileId: String,
         file: Object,
+        chat: Object,
     },
     emits: [
         'delete-file',
-        'suspend-file',
         'view-file',
         'rename-file',
     ],
@@ -68,8 +69,9 @@ export default {
             }
         },
 
-        suspendFile() {
-            this.$emit('suspend-file', this.fileId, !this.file.suspended);
+        async activateFile() {
+            const body = { [this.fileId]: this.isFileActive() };
+            await backendClient.setFilesActive(this.chat?.chat_id, body);
         },
 
         viewFile() {
@@ -117,6 +119,10 @@ export default {
             if (this.isEditingName) {
                 event.stopPropagation();
             }
+        },
+
+        isFileActive() {
+            return this.chat?.active_files?.includes(this.fileId);
         },
 
     },
