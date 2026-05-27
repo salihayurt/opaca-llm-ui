@@ -280,7 +280,7 @@ export default {
                 this.selectedFiles = [];
 
                 // update chats list
-                await this.$refs.sidebar.$refs.chats.updateChats();
+                await this.$refs.sidebar.updateChats();
             }
         },
 
@@ -367,7 +367,7 @@ export default {
                 aiBubble.toggleLoading(false);
                 this.startAutoSpeak();
                 this.scrollDownChat();
-                await this.$refs.sidebar.$refs.chats.updateChats();
+                await this.$refs.sidebar.updateChats();
             }
         },
 
@@ -525,7 +525,7 @@ export default {
             }
 
             if (result.type === 'ReloadChatsMessage') {
-                await this.$refs.sidebar.$refs.chats.updateChats();
+                await this.$refs.sidebar.updateChats();
             }
 
             if (result.type === "ConfirmActionNotification") {
@@ -810,21 +810,21 @@ export default {
         async handleDeleteChat(chatId) {
             await this.startNewChat();
             await backendClient.delete(chatId);
-            await this.$refs.sidebar.$refs.chats.updateChats(chatId);
+            await this.$refs.sidebar.updateChats();
         },
 
         async handleRenameChat(chatId, newName) {
             try {
                 await backendClient.updateName(chatId, newName);
             } finally {
-                await this.$refs.sidebar.$refs.chats.updateChats(chatId);
+                await this.$refs.sidebar.updateChats();
             }
         },
 
         async handleDeleteAllChats() {
             await this.startNewChat();
             await backendClient.deleteAllChats();
-            await this.$refs.sidebar.$refs.chats.updateChats();
+            await this.$refs.sidebar.updateChats();
         },
 
         async startNewChat() {
