@@ -106,11 +106,13 @@
 
                 <!-- uploaded files -->
                 <SidebarFiles
-                    :chat="this.chats?.[this.selectedChatId]"
+                    :selectedChatId="this.selectedChatId"
+                    :chats="this.chats"
                     v-show="SidebarManager.isViewSelected('files')"
                     @delete-file="fileId => this.$emit('delete-file', fileId)"
                     @view-file="$emit('view-file', $event)"
                     @rename-file="(fileId, newName) => this.$emit('rename-file', fileId, newName)"
+                    @update-chats="this.updateChats"
                     ref="files"
                 />
 

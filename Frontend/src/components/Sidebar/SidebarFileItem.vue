@@ -1,6 +1,6 @@
 <template>
     <div class="file align-items-center"
-         :class="{ 'file-suspended': file.suspended }"
+         :class="{ 'file-suspended': !this.isFileActive() }"
          @click.stop="this.viewFile()">
         <input
             class="file-name"
@@ -15,7 +15,7 @@
         />
         <i :class="[
             'fa fa-lg',
-            file.suspended ? 'fa-toggle-off' : 'fa-toggle-on',
+            this.isFileActive()? 'fa-toggle-on' : 'fa-toggle-off',
             'ms-auto',
             'file-menu-button'
             ]"
@@ -46,12 +46,15 @@ export default {
     props: {
         fileId: String,
         file: Object,
-        chat: Object,
+        selectedChatId: String,
+        chats: Array,
     },
     emits: [
         'delete-file',
         'view-file',
         'rename-file',
+        'update-chats',
+        'update-files',
     ],
     setup() {
         return { Localizer }
@@ -70,8 +73,14 @@ export default {
         },
 
         async activateFile() {
-            const body = { [this.fileId]: this.isFileActive() };
-            await backendClient.setFilesActive(this.chat?.chat_id, body);
+            try {
+                const body = { [this.fileId]: !this.isFileActive() };
+                await backendClient.setFilesActive(this.selectedChatId, body);
+                this.$emit('update-chats');
+                this.$emit('update-files');
+            } catch (e) {
+                console.error(`Failed to de/activate file: ${e}`);
+            }
         },
 
         viewFile() {
@@ -122,7 +131,8 @@ export default {
         },
 
         isFileActive() {
-            return this.chat?.active_files?.includes(this.fileId);
+            const chat = this.chats?.[this.selectedChatId];
+            return chat?.active_files?.includes(this.fileId);
         },
 
     },

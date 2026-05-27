@@ -14,10 +14,13 @@
             <SidebarFileItem
                 :file-id="file.file_id"
                 :file="file"
-                :chat="this.chat"
+                :selectedChatId="this.selectedChatId"
+                :chats="this.chats"
                 @delete-file="fileId => this.$emit('delete-file', fileId)"
                 @view-file="$emit('view-file', $event)"
                 @rename-file="(fileId, newName) => this.$emit('rename-file', fileId, newName)"
+                @update-chats="() => this.$emit('update-chats')"
+                @update-files="() => this.updateFiles()"
             />
         </div>
     </div>
@@ -33,7 +36,8 @@ export default {
     name: 'SidebarFiles',
     components: {SidebarFileItem},
     props: {
-        chat: Object,
+        selectedChatId: String,
+        chats: Array,
     },
     setup() {
         const {isMobile} = useDevice();
@@ -43,6 +47,7 @@ export default {
         'delete-file',
         'view-file',
         'rename-file',
+        'update-chats',
     ],
     data() {
         return {

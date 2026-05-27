@@ -311,7 +311,8 @@ async def query_chat(method: str, chat_id: str, message: QueryRequest, session: 
 
 @app.put("/chats/{chat_id}", description="Update a chat's name.", tags=["chat"])
 async def update_chat(chat_id: str, new_name: str | None = None, active_files: Dict[str, bool] | None = None, session: SessionData = Depends(handle_session_http)) -> None:
-    chat = session.get_or_create_chat(chat_id)
+    logger.info(f'Updating chat: {chat_id}, {new_name}, {active_files}')
+    chat = session.get_or_create_chat(chat_id, True)
 
     if new_name is not None:
         chat.name = new_name
