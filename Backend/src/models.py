@@ -17,7 +17,8 @@ from litellm.experimental_mcp_client.client import MCPClient
 from starlette.websockets import WebSocket
 from pydantic import BaseModel, Field, PrivateAttr, SerializeAsAny, ValidationError, model_serializer, model_validator
 
-from .opaca_client import OpacaClient
+from .opaca_client import OpacaClient, actions_blacklist
+from .abstract_method import actions_needing_confirmation
 
 
 logger = logging.getLogger(__name__)
@@ -462,9 +463,6 @@ class SessionData(BaseModel):
         tool.approval = approval
 
     def get_opaca_tool_approval(self, tool_name: str) -> ToolApprovalType:
-        from .opaca_client import actions_blacklist
-        from .abstract_method import actions_needing_confirmation
-
         lower_tool = tool_name.lower()
         if any(x.lower() in lower_tool for x in actions_blacklist):
             return "deny"
