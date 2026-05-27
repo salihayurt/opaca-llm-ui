@@ -231,7 +231,7 @@ async def get_container_approvals(container_id: str, session: SessionData = Depe
 
 @app.patch("/containers/{container_id}/approval", description="Update tool approval for a specific tool inside a container.", tags=["opaca"])
 async def update_container_approval(container_id: str, data: ToolApproval, session: SessionData = Depends(handle_session_http)) -> Response:
-    session.set_tool_approval(container_id, data.tool_name, data.approval)
+    session.set_opaca_tool_approval(container_id, data.tool_name, data.approval)
     return Response(status_code=204)
 
 

@@ -461,13 +461,22 @@ class SessionData(BaseModel):
         
         tool.approval = approval
 
-    def get_tool_approval(self, tool_name: str) -> ToolApprovalType:
+    def get_opaca_tool_approval(self, tool_name: str) -> ToolApprovalType:
+        from .opaca_client import actions_blacklist
+        from .abstract_method import actions_needing_confirmation
+
+        lower_tool = tool_name.lower()
+        if any(x.lower() in lower_tool for x in actions_blacklist):
+            return "deny"
+        if any(x.lower() in lower_tool for x in actions_needing_confirmation):
+            return "ask"
+
         for container_approvals in self.opaca_approvals.values():
             if tool_name in container_approvals:
                 return container_approvals[tool_name]
         return "allow"
 
-    def set_tool_approval(self, container_id: str, tool_name: str, approval: ToolApprovalType):
+    def set_opaca_tool_approval(self, container_id: str, tool_name: str, approval: ToolApprovalType):
         if container_id not in self.opaca_approvals:
             self.opaca_approvals[container_id] = {}
         self.opaca_approvals[container_id][tool_name] = approval

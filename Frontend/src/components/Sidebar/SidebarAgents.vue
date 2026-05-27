@@ -92,9 +92,9 @@
                                                     <i class="fa fa-wrench"/>
                                                     <span class="position-absolute top-100 start-100 p-1 rounded-circle"
                                                           :class="{
-                                                              'bg-warning': (approvals?.[`${agentId}--${action.name}`] || 'allow') === 'ask',
-                                                              'bg-danger': (approvals?.[`${agentId}--${action.name}`] || 'allow') === 'deny',
-                                                              'bg-success': (approvals?.[`${agentId}--${action.name}`] || 'allow') === 'allow'
+                                                              'bg-warning': getEffectiveApproval(agentId, action, approvals) === 'ask',
+                                                              'bg-danger': getEffectiveApproval(agentId, action, approvals) === 'deny',
+                                                              'bg-success': getEffectiveApproval(agentId, action, approvals) === 'allow'
                                                           }" style="outline: 2px solid var(--surface-color); transform: translate(-180%, -70%);">
                                                         <span class="visually-hidden">Approval State</span>
                                                     </span>
@@ -122,17 +122,20 @@
                                                 <div class="btn-group btn-group-sm w-100" role="group">
                                                     <input type="radio" class="btn-check" :name="`approval-${containerId}-${agentIndex}-${actionIndex}`" :id="`btn-ask-${containerId}-${agentIndex}-${actionIndex}`" autocomplete="off"
                                                         @change="e => setApproval(containerId, agentId, action.name, 'ask')"
-                                                        :checked="(approvals?.[`${agentId}--${action.name}`] || 'allow') === 'ask'">
+                                                        :checked="getEffectiveApproval(agentId, action, approvals) === 'ask'"
+                                                        :disabled="isOverrideApplied(agentId, action)">
                                                     <label class="btn btn-outline-secondary container-approval-ask" :for="`btn-ask-${containerId}-${agentIndex}-${actionIndex}`">Ask</label>
 
                                                     <input type="radio" class="btn-check" :name="`approval-${containerId}-${agentIndex}-${actionIndex}`" :id="`btn-deny-${containerId}-${agentIndex}-${actionIndex}`" autocomplete="off"
                                                         @change="e => setApproval(containerId, agentId, action.name, 'deny')"
-                                                        :checked="(approvals?.[`${agentId}--${action.name}`] || 'allow') === 'deny'">
+                                                        :checked="getEffectiveApproval(agentId, action, approvals) === 'deny'"
+                                                        :disabled="isOverrideApplied(agentId, action)">
                                                     <label class="btn btn-outline-secondary container-approval-deny" :for="`btn-deny-${containerId}-${agentIndex}-${actionIndex}`">Deny</label>
 
                                                     <input type="radio" class="btn-check" :name="`approval-${containerId}-${agentIndex}-${actionIndex}`" :id="`btn-allow-${containerId}-${agentIndex}-${actionIndex}`" autocomplete="off"
                                                         @change="e => setApproval(containerId, agentId, action.name, 'allow')"
-                                                        :checked="(approvals?.[`${agentId}--${action.name}`] || 'allow') === 'allow'">
+                                                        :checked="getEffectiveApproval(agentId, action, approvals) === 'allow'"
+                                                        :disabled="isOverrideApplied(agentId, action)">
                                                     <label class="btn btn-outline-secondary container-approval-allow" :for="`btn-allow-${containerId}-${agentIndex}-${actionIndex}`">Allow</label>
                                                 </div>
                                             </div>
@@ -188,9 +191,21 @@ export default {
             platformContainers: null,
             isLoading: false,
             searchQuery: '',
+            restrictedActions: { forbidden: [], need_confirmation: [] },
         };
     },
     methods: {
+        getEffectiveApproval(agentId, action, approvals) {
+            const toolName = `${agentId}--${action.name}`.toLowerCase();
+            if (this.restrictedActions.forbidden.some(x => toolName.includes(x.toLowerCase()))) return 'deny';
+            if (this.restrictedActions.need_confirmation.some(x => toolName.includes(x.toLowerCase()))) return 'ask';
+            return approvals?.[`${agentId}--${action.name}`] || 'allow';
+        },
+        isOverrideApplied(agentId, action) {
+            const toolName = `${agentId}--${action.name}`.toLowerCase();
+            return this.restrictedActions.forbidden.some(x => toolName.includes(x.toLowerCase())) || 
+                   this.restrictedActions.need_confirmation.some(x => toolName.includes(x.toLowerCase()));
+        },
         async setApproval(containerId, agentName, actionName, approval) {
             const toolName = `${agentName}--${actionName}`;
 
@@ -210,6 +225,7 @@ export default {
         async updatePlatformInfo() {
             this.isLoading = true;
             try {
+                this.restrictedActions = await backendClient.getRestrictedActions();
                 const externalContainers = this.isPlatformConnected
                     ? await backendClient.getContainers()
                     : [];

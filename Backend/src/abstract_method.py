@@ -241,7 +241,7 @@ class AbstractMethod(ABC):
         else:
             agent_name, action_name = None, tool_name
 
-        approval_state = self.session.get_tool_approval(tool_name)
+        approval_state = self.session.get_opaca_tool_approval(tool_name)
         if approval_state == 'deny':
             return ToolCall(id=tool_id, type="opaca", name=tool_name, args=tool_args, result="Execution denied by user settings, do not attempt again.")
         if approval_state == 'ask':
@@ -322,7 +322,7 @@ class AbstractMethod(ABC):
         # Filter out OPACA/internal tools that are explicitly denied
         filtered_tools = []
         for tool in tools:
-            if self.session.get_tool_approval(tool["name"]) != 'deny':
+            if self.session.get_opaca_tool_approval(tool["name"]) != 'deny':
                 filtered_tools.append(tool)
         tools = filtered_tools
 

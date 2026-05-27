@@ -28,6 +28,10 @@ class BackendClient {
         return await this.sendRequest("GET", "internal-tools");
     }
 
+    async getRestrictedActions() {
+        return await this.sendRequest("GET", "admin/restrict");
+    }
+
     async deployContainer(postContainer, update = false) {
         return await this.sendRequest("POST", `containers?update=${update}`, postContainer);
     }
