@@ -278,7 +278,8 @@ async def update_mcp_tool_approval(data: MCPToolApproval, server_label: str, ses
 async def get_chats(session: SessionData = Depends(handle_session_http)) -> List[Chat]:
     chats = [
         Chat(chat_id=chat.chat_id, name=chat.name, is_finished=chat.is_finished,
-             time_created=chat.time_created, time_modified=chat.time_modified)
+             time_created=chat.time_created, time_modified=chat.time_modified,
+             active_files=chat.active_files,)
         for chat in session.chats.values()
     ]
     chats.sort(key=lambda chat: chat.time_modified, reverse=True)
@@ -312,7 +313,6 @@ async def query_chat(method: str, chat_id: str, message: QueryRequest, session: 
 
 @app.put("/chats/{chat_id}", description="Update a chat's name.", tags=["chat"])
 async def update_chat(chat_id: str, new_name: str | None = None, active_files: Dict[str, bool] | None = None, session: SessionData = Depends(handle_session_http)) -> None:
-    logger.info(f'Updating chat: {chat_id}, {new_name}, {active_files}')
     chat = session.get_or_create_chat(chat_id, True)
 
     if new_name is not None:
@@ -432,7 +432,6 @@ async def upload_files(chat_id: str | None = None, files: List[UploadFile] | Non
     if chat_id is not None:
         chat = session.get_or_create_chat(chat_id, True)
         chat.active_files |= {file.file_id for file in uploaded}
-        logger.info(f'UPLOAD FILES: {chat.chat_id} -> {chat.active_files}')
 
     return {"uploaded_files": uploaded}
 
