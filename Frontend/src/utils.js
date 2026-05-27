@@ -121,7 +121,7 @@ class BackendClient {
         await this.sendRequest("PATCH", `files/${file_id}?name=${name}`);
     }
 
-    async uploadFiles(files) {
+    async uploadFiles(files, chat_id = null) {
         const formData = new FormData();
         for (const file of files) {
             formData.append("files", file);
@@ -130,6 +130,9 @@ class BackendClient {
         const response = await axios.post(`${conf.BackendAddress}/files`, formData, {
             timeout: 10000,
             withCredentials: true,
+            params: {
+                chat_id: chat_id,
+            },
             headers: {
                 'Content-Type': 'multipart/form-data',
                 'Access-Control-Allow-Origin': '*'

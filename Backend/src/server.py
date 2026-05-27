@@ -21,9 +21,10 @@ from starlette.datastructures import Headers
 from openai import OpenAI
 
 from . import sample_prompts as prompts
-from .models import ConnectRequest, MCPToolApproval, QueryRequest, QueryResponse, ConfigPayload, Chat, RestrictedActions, \
+from .models import ConnectRequest, MCPToolApproval, QueryRequest, QueryResponse, ConfigPayload, Chat, \
+    RestrictedActions, \
     SearchResult, get_supported_models, SessionData, OpacaException, MCPCreateMessage, PushMessage, \
-    InvokeRequest, InvokeResponse, SessionPrompts, ReloadChatsMessage
+    InvokeRequest, InvokeResponse, SessionPrompts, ReloadChatsMessage, OpacaFile
 from .simple import SimpleMethod
 from .simple_tools import SimpleToolsMethod
 from .toolllm import ToolLLMMethod
@@ -415,8 +416,9 @@ async def get_files(session: SessionData = Depends(handle_session_http)) -> dict
 
 
 @app.post("/files", description="Upload a file to the backend, to be sent to the LLM for consideration with the next user queries.", tags=["files"])
-async def upload_files(files: List[UploadFile], session: SessionData = Depends(handle_session_http)):
-    uploaded = []
+async def upload_files(chat_id: str | None = None, files: List[UploadFile] | None = None, session: SessionData = Depends(handle_session_http)):
+    if files is None: files = []
+    uploaded: List[OpacaFile] = []
     for file in files:
         try:
             filedata = await save_file_to_disk(file, session)
@@ -426,6 +428,11 @@ async def upload_files(files: List[UploadFile], session: SessionData = Depends(h
                 status_code=500,
                 detail=f"Failed to process file {file.filename}: {str(e)}"
             )
+
+    if chat_id is not None:
+        chat = session.get_or_create_chat(chat_id, True)
+        chat.active_files |= {file.file_id for file in uploaded}
+        logger.info(f'UPLOAD FILES: {chat.chat_id} -> {chat.active_files}')
 
     return {"uploaded_files": uploaded}
 
