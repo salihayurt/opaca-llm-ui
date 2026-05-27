@@ -131,7 +131,7 @@ export default {
         },
 
         isFileActive() {
-            const chat = this.chats?.[this.selectedChatId];
+            const chat = this.chats?.find(chat => chat.chat_id === this.selectedChatId);
             return chat?.active_files?.includes(this.fileId);
         },
 

@@ -460,6 +460,7 @@ export default {
                 });
 
                 await this.$refs.sidebar.$refs.files.updateFiles();
+                await this.$refs.sidebar.updateChats();
             } catch (error) {
                 console.error("File upload failed:", error);
                 this.showInfo("File upload failed. See console for details.");
