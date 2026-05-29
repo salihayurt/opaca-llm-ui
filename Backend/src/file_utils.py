@@ -72,7 +72,7 @@ async def upload_files(session: SessionData, chat: Chat, model: str):
         if is_image(file_data.file_name) and model_supports_vision:
             parts.append({"type": "input_image", "file_id": file_data.host_ids[host]})
         else:
-            parts.append({"type": "input_file", "file_id": filedata.host_ids[host]})
+            parts.append({"type": "input_file", "file_id": file_data.host_ids[host]})
 
     return parts
 
