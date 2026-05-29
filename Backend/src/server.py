@@ -8,6 +8,8 @@ import io
 import json
 from typing import Dict, Any, List, Union, Optional
 from http import HTTPStatus
+
+from fastapi_plugin import Auth0FastAPI
 from httpx import HTTPStatusError
 import asyncio
 import logging
@@ -88,6 +90,12 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+)
+
+# Initialize Auth0
+auth0 = Auth0FastAPI(
+    domain=os.getenv("AUTH0_DOMAIN"),
+    audience=os.getenv("AUTH0_AUDIENCE", "Not-set"),    # TODO what to use as default?
 )
 
 # SIMPLE AUTH FOR SELECTED ROUTES
@@ -541,6 +549,17 @@ async def whisper_generate(text: str = Query(""), voice: str = Query("alloy")) -
         media_type="audio/mpeg",
         headers={"Content-Disposition": "attachment; filename=generated_audio.mp3"}
     )
+
+
+# USERS
+
+@app.get("/users/me", tags=["user"])
+async def get_me(claims: dict = Depends(auth0.require_auth())):
+    return {
+        "user_id": claims.get("sub"),
+        "email": claims.get("email"),
+        "permissions": claims.get("permissions", []),
+    }
 
 
 # WEBSOCKET CONNECTION (permanently opened)

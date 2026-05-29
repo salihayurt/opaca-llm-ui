@@ -152,12 +152,18 @@ import OptionsSelect from "./components/OptionsSelect.vue";
 import {setColorTheme} from './ColorThemes.js';
 import CookieBanner from './components/CookieBanner.vue';
 import InputDialogue from './components/InputDialogue.vue';
+import {useAuth0} from "@auth0/auth0-vue";
 
 export default {
     name: 'App',
     components: {OptionsSelect, MainContent, CookieBanner, Notifications, InputDialogue},
     setup() {
         const { isMobile } = useDevice();
+        const { getAccessTokenSilently, isAuthenticated } = useAuth0();
+        backendClient.init({
+            getTokenFn: getAccessTokenSilently,
+            isAuthenticated: () => isAuthenticated
+        })
         return { conf, Localizer, isMobile };
     },
     data() {

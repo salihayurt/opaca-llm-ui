@@ -12,3 +12,4 @@ litellm>=1.81.0
 mcp>=1.23.3
 rich>=14.0.0
 langchain-sandbox>=0.0.6
+auth0-fastapi-api>=1.0.0b7

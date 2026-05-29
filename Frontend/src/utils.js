@@ -1,8 +1,14 @@
 import conf from '../config.js';
 import axios from "axios";
+import {useAuth0} from "@auth0/auth0-vue";
 
 
 class BackendClient {
+
+    init({ getTokenFn, isAuthenticated }) {
+        this.getTokenFn = getTokenFn
+        this.isAuthenticated = isAuthenticated
+    }
 
     // OPACA connection
 
@@ -130,7 +136,8 @@ class BackendClient {
             withCredentials: true,
             headers: {
                 'Content-Type': 'multipart/form-data',
-                'Access-Control-Allow-Origin': '*'
+                'Access-Control-Allow-Origin': '*',
+                'Authorization': this.isAuthenticated ? `Bearer ${this.getTokenFn()}` : ``
             }
         }).catch(error => {
             console.error('Upload failed:', error);
@@ -186,9 +193,21 @@ class BackendClient {
         return await this.sendRequest("PATCH", `mcp/${serverLabel}/approval`, body);
     }
 
+    // auth
+
+    async auth_me() {
+        const data = await this.sendRequest("GET", "users/me", null, 10000);
+        console.log(data)
+        return data
+    }
+
     // internal helper
 
     async sendRequest(method, path, body = null, timeout = 10000) {
+        console.log(`${path}: ${this.isAuthenticated}`)
+        if (this.isAuthenticated) {
+            console.log(this.getTokenFn())
+        }
         const response = await axios.request({
             method: method,
             url: `${conf.BackendAddress}/${path}`,
@@ -197,7 +216,8 @@ class BackendClient {
             withCredentials: true,
             headers: {
                 'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*'
+                'Access-Control-Allow-Origin': '*',
+                'Authorization': this.isAuthenticated ? `Bearer ${this.getTokenFn()}` : ``
             }
         });
         return response.data;

@@ -73,6 +73,31 @@
                class="fa fa-question-circle sidebar-menu-item"
                :title="Localizer.get('sidebar_faq')"
                v-bind:class="{'sidebar-menu-item-select': SidebarManager.isViewSelected('faq')}"/>
+
+            <!-- Always Visible: User Profile -->
+            <div class="sidebar-account-wrapper">
+                <i @click.stop="toggleProfileMenu()"
+                   class="fa fa-user sidebar-menu-item"
+                   :title="Localizer.get('sidebar_account')"
+                   v-bind:class="{'sidebar-menu-item-select': accountMenuOpen}"/>
+
+                <div v-if="accountMenuOpen"
+                     class="sidebar-account-menu"
+                     @click.stop>
+                    <button type="button"
+                            class="sidebar-account-menu-button"
+                            @click="handleProfileAuthClick()">
+                        <i :class="['fa', this.isAuthenticated ? 'fa-right-from-bracket' : 'fa-right-to-bracket']"/>
+                        <span>{{ this.isAuthenticated ? Localizer.get('account_logout') : Localizer.get('account_login') }}</span>
+                    </button>
+                    <button type="button"
+                            class="sidebar-account-menu-button"
+                            @click="handleProfileSettingsClick()">
+                        <i class="fa fa-gear"/>
+                        <span>{{ Localizer.get('settings_menu') }}</span>
+                    </button>
+                </div>
+            </div>
         </div>
 
         <!-- sidebar content -->
@@ -172,6 +197,7 @@ import conf from '../../../config.js'
 import { useDevice } from "../../useIsMobile.js";
 import SidebarManager from "../../SidebarManager.js";
 import Cookie from "js-cookie";
+import { useAuth0 } from "@auth0/auth0-vue";
 import Localizer from "../../Localizer.js";
 import SidebarQuestions from './SidebarQuestions.vue';
 import SidebarAgents from "./SidebarAgents.vue";
@@ -183,6 +209,7 @@ import SidebarFaq from "./SidebarFaq.vue";
 import SidebarChats from "./SidebarChats.vue";
 import SidebarFiles from "./SidebarFiles.vue";
 import SidebarMcp from "./SidebarMcp.vue";
+import backendClient from "../../utils.js";
 
 export default {
     name: 'Sidebar',
@@ -221,15 +248,43 @@ export default {
     ],
     setup() {
         const { isMobile } = useDevice();
-        return { SidebarManager, Localizer, isMobile };
+        const { loginWithPopup, isLoading, logout, user, isAuthenticated } = useAuth0();
+        return { SidebarManager, Localizer, isMobile, loginWithPopup, isLoading, logout, user, isAuthenticated };
     },
     data() {
         return {
             sidebarCollapsed: true,
             sidebarToggleHovered: false,
+            accountMenuOpen: false,
         };
     },
     methods: {
+        toggleProfileMenu() {
+            this.accountMenuOpen = !this.accountMenuOpen;
+            console.log(`${this.isAuthenticated}`)
+        },
+
+        closeProfileMenu() {
+            this.accountMenuOpen = false;
+        },
+
+        async handleProfileAuthClick() {
+            if (this.isAuthenticated) {
+                await this.logout({ logoutParams: { returnTo: window.location.origin } });
+                // TODO logout from backend
+                return
+            }
+            await this.loginWithPopup({ authorizationParams: { screen_hint: 'signup' }})
+
+            // Now call the /users/me endpoint to retrieve the current user data
+            await backendClient.auth_me()
+
+        },
+
+        handleProfileSettingsClick() {
+            this.closeProfileMenu();
+        },
+
         toggleSidebar() {
             this.sidebarCollapsed = !this.sidebarCollapsed;
             Cookie.set('sidebar_collapsed', this.sidebarCollapsed);
@@ -281,6 +336,7 @@ export default {
     },
     mounted() {
         this.setupResizer();
+        document.addEventListener('click', this.closeProfileMenu);
 
         this.sidebarCollapsed = Cookie.get('sidebar_collapsed') !== 'false';
 
@@ -290,6 +346,9 @@ export default {
             const selectedView = Cookie.get('selected_view') ?? conf.DefaultSidebarView;
             SidebarManager.selectView(selectedView, this.sidebarCollapsed);
         }
+    },
+    beforeUnmount() {
+        document.removeEventListener('click', this.closeProfileMenu);
     },
 }
 </script>
@@ -362,6 +421,47 @@ export default {
 .sidebar-menu-item-select:hover {
     background-color: var(--secondary-color);
     color: white !important;
+}
+
+.sidebar-account-wrapper {
+    position: relative;
+}
+
+.sidebar-account-menu {
+    position: absolute;
+    left: calc(100% + 0.5rem);
+    bottom: 0;
+    min-width: 10rem;
+    padding: 0.35rem;
+    background-color: var(--surface-color);
+    border: 1px solid var(--border-color);
+    border-radius: var(--bs-border-radius);
+    z-index: 1001;
+}
+
+.sidebar-account-menu-button {
+    width: 100%;
+    min-height: 2.25rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.45rem 0.65rem;
+    border: 0;
+    border-radius: var(--bs-border-radius-sm);
+    background: transparent;
+    color: var(--text-primary-color);
+    text-align: left;
+    white-space: nowrap;
+}
+
+.sidebar-account-menu-button:hover {
+    background-color: var(--background-color);
+    color: var(--primary-color);
+}
+
+.sidebar-account-menu-button i {
+    width: 1rem;
+    text-align: center;
 }
 
 .sidebar-menu-toggle {
