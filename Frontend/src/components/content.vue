@@ -749,6 +749,7 @@ export default {
                     const isLoading = !chat.is_finished && index === numResponses - 1;
                     await this.addChatBubble(msg.content, false, isLoading);
                     await nextTick();
+                    const aiBubble = this.getLastBubble();
 
                     for (const agent_message of msg.agent_messages) {
                         const chunk = {
@@ -767,7 +768,6 @@ export default {
                             execution_time: agent_message.execution_time,
                             metrics: agent_message.response_metadata
                         };
-                        const aiBubble = this.getLastBubble();
                         aiBubble?.addMetric(metric)
                     }
                     if (msg.error) {
