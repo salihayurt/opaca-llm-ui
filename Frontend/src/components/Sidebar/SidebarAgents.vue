@@ -174,6 +174,7 @@ import Localizer from "../../Localizer.js";
 import { useDevice } from "../../useIsMobile.js";
 import backendClient from "../../utils.js";
 import InputDialogue from '../InputDialogue.vue';
+import { getEffectiveApproval, matchesRestrictedTool } from '../../approvalUtils.js';
 import Cookie from "js-cookie";
 
 export default {
@@ -196,15 +197,10 @@ export default {
     },
     methods: {
         getEffectiveApproval(agentId, action, approvals) {
-            const toolName = `${agentId}--${action.name}`.toLowerCase();
-            if (this.restrictedActions.forbidden.some(x => toolName.includes(x.toLowerCase()))) return 'deny';
-            if (this.restrictedActions.need_confirmation.some(x => toolName.includes(x.toLowerCase()))) return 'ask';
-            return approvals?.[`${agentId}--${action.name}`] || 'allow';
+            return getEffectiveApproval(`${agentId}--${action.name}`, approvals?.[`${agentId}--${action.name}`], this.restrictedActions);
         },
         isOverrideApplied(agentId, action) {
-            const toolName = `${agentId}--${action.name}`.toLowerCase();
-            return this.restrictedActions.forbidden.some(x => toolName.includes(x.toLowerCase())) || 
-                   this.restrictedActions.need_confirmation.some(x => toolName.includes(x.toLowerCase()));
+            return matchesRestrictedTool(`${agentId}--${action.name}`, this.restrictedActions);
         },
         async setApproval(containerId, agentName, actionName, approval) {
             const toolName = `${agentName}--${actionName}`;
