@@ -7,6 +7,18 @@ export function matchesRestrictedTool(toolName, restrictions) {
         (restrictions?.need_confirmation ?? []).some(fragment => normalizedToolName.includes(fragment.toLowerCase()));
 }
 
+export function isForbiddenTool(toolName, restrictions) {
+    const normalizedToolName = toolName.toLowerCase();
+
+    return (restrictions?.forbidden ?? []).some(fragment => normalizedToolName.includes(fragment.toLowerCase()));
+}
+
+export function isConfirmationTool(toolName, restrictions) {
+    const normalizedToolName = toolName.toLowerCase();
+
+    return (restrictions?.need_confirmation ?? []).some(fragment => normalizedToolName.includes(fragment.toLowerCase()));
+}
+
 export function getEffectiveApproval(toolName, approval, restrictions) {
     const normalizedToolName = toolName.toLowerCase();
     const normalizedApproval = approval || 'allow';

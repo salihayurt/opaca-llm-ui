@@ -73,19 +73,19 @@
                                         <input type="radio" class="btn-check" :name="'approval-' + mcpServerIndex + '-' + mcpIndex" :id="'btn-ask-' + mcpServerIndex + '-' + mcpIndex" autocomplete="off"
                                             @change="e => setApproval(mcp.server_label, mcp.name, 'ask')"
                                             :checked="getEffectiveApproval(mcp) === 'ask'"
-                                            :disabled="isOverrideApplied(mcp)">
+                                            :disabled="isForbiddenApplied(mcp)">
                                         <label class="btn btn-outline-secondary mcp-approval-ask" :for="'btn-ask-' + mcpServerIndex + '-' + mcpIndex">Ask</label>
 
                                         <input type="radio" class="btn-check" :name="'approval-' + mcpServerIndex + '-' + mcpIndex" :id="'btn-deny-' + mcpServerIndex + '-' + mcpIndex" autocomplete="off"
                                             @change="e => setApproval(mcp.server_label, mcp.name, 'deny')"
                                             :checked="getEffectiveApproval(mcp) === 'deny'"
-                                            :disabled="isOverrideApplied(mcp)">
+                                            :disabled="isForbiddenApplied(mcp)">
                                         <label class="btn btn-outline-secondary mcp-approval-deny" :for="'btn-deny-' + mcpServerIndex + '-' + mcpIndex">Deny</label>
 
                                         <input type="radio" class="btn-check" :name="'approval-' + mcpServerIndex + '-' + mcpIndex" :id="'btn-allow-' + mcpServerIndex + '-' + mcpIndex" autocomplete="off"
                                             @change="e => setApproval(mcp.server_label, mcp.name, 'allow')"
                                             :checked="getEffectiveApproval(mcp) === 'allow'"
-                                            :disabled="isOverrideApplied(mcp)">
+                                            :disabled="isForbiddenApplied(mcp) || isConfirmationApplied(mcp)">
                                         <label class="btn btn-outline-secondary mcp-approval-allow" :for="'btn-allow-' + mcpServerIndex + '-' + mcpIndex">Allow</label>
                                     </div>
                                 </div>
@@ -114,7 +114,7 @@ import Localizer from "../../Localizer.js";
 import { useDevice } from "../../useIsMobile.js";
 import backendClient from "../../utils.js";
 import InputDialogue from '../InputDialogue.vue';
-import { getEffectiveApproval, matchesRestrictedTool } from '../../approvalUtils.js';
+import { getEffectiveApproval, isConfirmationTool, isForbiddenTool } from '../../approvalUtils.js';
 
 export default {
     name: 'SidebarMcp',
@@ -213,8 +213,12 @@ export default {
             return getEffectiveApproval(`${mcp.server_label}--${mcp.name}`, mcp.approval, this.restrictedActions);
         },
 
-        isOverrideApplied(mcp) {
-            return matchesRestrictedTool(`${mcp.server_label}--${mcp.name}`, this.restrictedActions);
+        isForbiddenApplied(mcp) {
+            return isForbiddenTool(`${mcp.server_label}--${mcp.name}`, this.restrictedActions);
+        },
+
+        isConfirmationApplied(mcp) {
+            return isConfirmationTool(`${mcp.server_label}--${mcp.name}`, this.restrictedActions);
         },
 
         async setApproval(serverLabel, toolName, approval) {

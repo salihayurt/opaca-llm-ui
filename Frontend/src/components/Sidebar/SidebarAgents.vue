@@ -123,19 +123,19 @@
                                                     <input type="radio" class="btn-check" :name="`approval-${containerId}-${agentIndex}-${actionIndex}`" :id="`btn-ask-${containerId}-${agentIndex}-${actionIndex}`" autocomplete="off"
                                                         @change="e => setApproval(containerId, agentId, action.name, 'ask')"
                                                         :checked="getEffectiveApproval(agentId, action, approvals) === 'ask'"
-                                                        :disabled="isOverrideApplied(agentId, action)">
+                                                        :disabled="isForbiddenApplied(agentId, action)">
                                                     <label class="btn btn-outline-secondary container-approval-ask" :for="`btn-ask-${containerId}-${agentIndex}-${actionIndex}`">Ask</label>
 
                                                     <input type="radio" class="btn-check" :name="`approval-${containerId}-${agentIndex}-${actionIndex}`" :id="`btn-deny-${containerId}-${agentIndex}-${actionIndex}`" autocomplete="off"
                                                         @change="e => setApproval(containerId, agentId, action.name, 'deny')"
                                                         :checked="getEffectiveApproval(agentId, action, approvals) === 'deny'"
-                                                        :disabled="isOverrideApplied(agentId, action)">
+                                                        :disabled="isForbiddenApplied(agentId, action)">
                                                     <label class="btn btn-outline-secondary container-approval-deny" :for="`btn-deny-${containerId}-${agentIndex}-${actionIndex}`">Deny</label>
 
                                                     <input type="radio" class="btn-check" :name="`approval-${containerId}-${agentIndex}-${actionIndex}`" :id="`btn-allow-${containerId}-${agentIndex}-${actionIndex}`" autocomplete="off"
                                                         @change="e => setApproval(containerId, agentId, action.name, 'allow')"
                                                         :checked="getEffectiveApproval(agentId, action, approvals) === 'allow'"
-                                                        :disabled="isOverrideApplied(agentId, action)">
+                                                        :disabled="isForbiddenApplied(agentId, action) || isConfirmationApplied(agentId, action)">
                                                     <label class="btn btn-outline-secondary container-approval-allow" :for="`btn-allow-${containerId}-${agentIndex}-${actionIndex}`">Allow</label>
                                                 </div>
                                             </div>
@@ -174,7 +174,7 @@ import Localizer from "../../Localizer.js";
 import { useDevice } from "../../useIsMobile.js";
 import backendClient from "../../utils.js";
 import InputDialogue from '../InputDialogue.vue';
-import { getEffectiveApproval, matchesRestrictedTool } from '../../approvalUtils.js';
+import { getEffectiveApproval, isConfirmationTool, isForbiddenTool } from '../../approvalUtils.js';
 import Cookie from "js-cookie";
 
 export default {
@@ -199,8 +199,11 @@ export default {
         getEffectiveApproval(agentId, action, approvals) {
             return getEffectiveApproval(`${agentId}--${action.name}`, approvals?.[`${agentId}--${action.name}`], this.restrictedActions);
         },
-        isOverrideApplied(agentId, action) {
-            return matchesRestrictedTool(`${agentId}--${action.name}`, this.restrictedActions);
+        isForbiddenApplied(agentId, action) {
+            return isForbiddenTool(`${agentId}--${action.name}`, this.restrictedActions);
+        },
+        isConfirmationApplied(agentId, action) {
+            return isConfirmationTool(`${agentId}--${action.name}`, this.restrictedActions);
         },
         async setApproval(containerId, agentName, actionName, approval) {
             const toolName = `${agentName}--${actionName}`;
