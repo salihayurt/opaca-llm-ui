@@ -1,6 +1,7 @@
 """
 Request and response models used in the FastAPI routes (and in some of the implementations).
 """
+from enum import Enum
 import re
 from typing import Callable, Iterable, Set, Literal, Annotated
 from typing import List, Dict, Any, Iterator
@@ -17,8 +18,7 @@ from litellm.experimental_mcp_client.client import MCPClient
 from starlette.websockets import WebSocket
 from pydantic import BaseModel, Field, PrivateAttr, SerializeAsAny, ValidationError, model_serializer, model_validator
 
-from .opaca_client import OpacaClient, actions_blacklist
-from .abstract_method import actions_needing_confirmation
+from .opaca_client import OpacaClient
 
 
 logger = logging.getLogger(__name__)
@@ -215,8 +215,10 @@ class InternalTool(BaseModel):
     requires_code_execution: bool = False
 
 
-ToolApprovalType = Literal["ask", "deny", "allow"]
-
+class ApprovalState(Enum):
+    ASK = "ask"
+    DENY = "deny"
+    ALLOW = "allow"
 
 class ScheduledTask(BaseModel):
     """
@@ -303,7 +305,7 @@ class MCPTool(BaseModel):
     description: str
     inputSchema: Dict[str, Any]
     server_label: str
-    approval: ToolApprovalType
+    approval: ApprovalState
 
     def get_full_name(self) -> str:
         """Get the full tool name as expected by the LLM, including the server label."""
@@ -369,7 +371,7 @@ class SessionData(BaseModel):
     notifications_chats_map: Dict[int, Set[str]] = Field(default_factory=dict)
     valid_until: float = -1
     mcp_servers: Dict[str, MCPServer] = Field(default_factory=dict)
-    opaca_approvals: Dict[str, Dict[str, ToolApprovalType]] = Field(default_factory=dict)
+    opaca_approvals: Dict[str, Dict[str, ApprovalState]] = Field(default_factory=dict)
     blocked: bool = False
     prompts: SessionPrompts | None = None
 
@@ -449,7 +451,7 @@ class SessionData(BaseModel):
             tools[server.params.server_label] = list(server.tools.values())
         return tools
 
-    async def set_mcp_tool_approval(self, server_label: str, tool_name: str, approval: ToolApprovalType):
+    async def set_mcp_tool_approval(self, server_label: str, tool_name: str, approval: ApprovalState):
         """Set whether a tool call should be allowed, denied, or require confirmation by the user."""
         server = self.mcp_servers.get(server_label)
         if not server:
@@ -462,19 +464,14 @@ class SessionData(BaseModel):
         
         tool.approval = approval
 
-    def get_opaca_tool_approval(self, tool_name: str) -> ToolApprovalType:
-        lower_tool = tool_name.lower()
-        if any(x.lower() in lower_tool for x in actions_blacklist):
-            return "deny"
-        if any(x.lower() in lower_tool for x in actions_needing_confirmation):
-            return "ask"
-
+    def get_opaca_tool_approval(self, tool_name: str) -> ApprovalState:
+        """Returns the approval state for a given OPACA/internal tool the user has set. It does not check the admin blacklist."""
         for container_approvals in self.opaca_approvals.values():
             if tool_name in container_approvals:
                 return container_approvals[tool_name]
-        return "allow"
+        return ApprovalState.ALLOW
 
-    def set_opaca_tool_approval(self, container_id: str, tool_name: str, approval: ToolApprovalType):
+    def set_opaca_tool_approval(self, container_id: str, tool_name: str, approval: ApprovalState):
         if container_id not in self.opaca_approvals:
             self.opaca_approvals[container_id] = {}
         self.opaca_approvals[container_id][tool_name] = approval
@@ -516,7 +513,7 @@ class SessionData(BaseModel):
         params["require_approval"] = "always"
 
         # Extract and remove default_approval from the mcp_server dict (prevent litellm unknown parameter exception)
-        default_approval = params.pop("default_approval", "ask")
+        default_approval = params.pop("default_approval", ApprovalState.ASK)
 
         mcp_tools = {}
         for tool in client_tools:
@@ -618,7 +615,7 @@ class MCPCreateMessage(BaseModel):
 
 class ToolApproval(BaseModel):
     tool_name: str
-    approval: ToolApprovalType
+    approval: ApprovalState
 
 
 # MESSAGES SENT OR RECEIVED VIA WEBSOCKET
