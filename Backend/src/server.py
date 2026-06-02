@@ -438,7 +438,7 @@ async def upload_files(chat_id: str | None = None, files: List[UploadFile] | Non
         chat = session.get_or_create_chat(chat_id, True)
         chat.active_files |= {file.file_id for file in uploaded}
 
-    return {"uploaded_files": uploaded}
+    return {"uploadedFiles": uploaded}
 
 
 @app.delete("/files/{file_id}", description="Delete an uploaded file.", tags=["files"])

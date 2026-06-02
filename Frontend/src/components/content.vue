@@ -445,7 +445,7 @@ export default {
             try {
                 const result = await backendClient.uploadFiles(files, this.selectedChatId);
 
-                result.uploadedFiles.forEach((uploaded, idx) => {
+                result.uploadedFiles?.forEach((uploaded, idx) => {
                     const wrapper = wrappedFiles[idx];
                     wrapper.fileId = uploaded.file_id;
                     wrapper.isUploading = false;

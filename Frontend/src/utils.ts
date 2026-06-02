@@ -143,7 +143,7 @@ class BackendClient {
             timeout: 10000,
             withCredentials: true,
             params: {
-                chat_id: chat_id,
+                chat_id: chatId,
             },
             headers: {
                 'Content-Type': 'multipart/form-data',
