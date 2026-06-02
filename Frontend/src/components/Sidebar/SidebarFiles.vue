@@ -52,7 +52,6 @@ export default {
     data() {
         return {
             files: {},
-            showFileMenu: false,
         };
     },
     methods: {

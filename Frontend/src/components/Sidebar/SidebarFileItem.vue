@@ -35,11 +35,9 @@
 
 <script>
 import Localizer from "../../Localizer.js";
-import config from "../../../config.js";
+import conf from "../../../config.js";
 import {nextTick} from "vue";
 import backendClient from "../../utils.js";
-
-const BACKEND_ADDRESS = config.BackendAddress;
 
 export default {
     name: 'SidebarFileItem',
@@ -86,7 +84,7 @@ export default {
         viewFile() {
             this.$emit('view-file', {
                 fileName: this.file.file_name,
-                src: `${BACKEND_ADDRESS}/files/${this.fileId}/view`,
+                src: `${conf.backendUrl}/files/${this.fileId}/view`,
                 mimeType: this.file.content_type
             });
         },
