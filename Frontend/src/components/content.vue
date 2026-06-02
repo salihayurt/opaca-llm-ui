@@ -20,13 +20,10 @@
         />
 
         <Sidebar
-            :method="method"
-            :language="language"
             :connected="connected"
             :selected-chat-id="selectedChatId"
             ref="sidebar"
             @select-question="question => this.handleSelectQuestion(question)"
-            @select-category="category => this.handleSelectCategory(category)"
             @select-chat="chatId => this.handleSelectChat(chatId)"
             @delete-chat="chatId => this.handleDeleteChat(chatId)"
             @rename-chat="(chatId, newName) => this.handleRenameChat(chatId, newName)"
@@ -67,7 +64,7 @@
                     <div v-if="!this.isMobile" class="w-100 p-3 text-center fs-4">
                         {{ Localizer.get("chatarea_welcome") }}
                     </div>
-                    <div v-for="(question, index) in Localizer.getSampleQuestions(this.textInput, this.selectedCategory)"
+                    <div v-for="(question, index) in Localizer.getSampleQuestions(this.textInput, conf.selectedCategory)"
                          :key="index"
                          class="sample-question"
                          @click="this.askSampleQuestion(question.question)">
@@ -201,7 +198,7 @@ import {nextTick} from "vue";
 import * as uuid from "uuid";
 import Sidebar from "./Sidebar/Sidebar.vue";
 import Chatbubble from "./chatbubble.vue";
-import conf from '../../config'
+import conf, {addListener} from '../../config.js'
 import backendClient, { formatAgentDebugText, formatToolDebugResult } from "../utils.js";
 import Localizer from "../Localizer.js";
 import AudioManager from "../AudioManager.js";
@@ -230,19 +227,16 @@ export default {
         FileDropHandler,
     },
     props: {
-        method: String,
-        language: String,
         connected: Boolean,
     },
     emits: [
-        'select-category',
         'container-login-required',
         'api-key-required',
         'new-notification',
     ],
     setup() {
         const { isMobile } = useDevice()
-        return { Localizer, AudioManager, isMobile };
+        return { conf, Localizer, AudioManager, isMobile };
     },
     data() {
         return {
@@ -250,7 +244,6 @@ export default {
             textInput: '',
             showExampleQuestions: true,
             autoSpeakNextMessage: false,
-            selectedCategory: conf.DefaultQuestions,
             isSmallScrollbar: true,
             selectedFiles: [],
             selectedChatId: '',
@@ -510,7 +503,7 @@ export default {
             try {
                 const result = await backendClient.uploadFiles(files);
 
-                result.uploaded_files.forEach((uploaded, idx) => {
+                result.uploadedFiles.forEach((uploaded, idx) => {
                     const wrapper = wrappedFiles[idx];
                     wrapper.fileId = uploaded.file_id;
                     wrapper.isUploading = false;
@@ -579,7 +572,7 @@ export default {
         },
 
         async connectWebsocket() {
-            const url = `${conf.BackendAddress}/ws`
+            const url = `${conf.backendUrl}/ws`
             this.socket = new WebSocket(url);
             this.socket.onmessage = event => this.handleStreamingSocketMessage(event);
         },
@@ -866,12 +859,8 @@ export default {
         },
 
         handleSelectCategory(category) {
-            if (this.selectedCategory !== category) {
-                if (this.showExampleQuestions) {
-                    Localizer.reloadSampleQuestions(category);
-                }
-                this.selectedCategory = category;
-                this.$emit('select-category', category);
+            if (this.showExampleQuestions) {
+                Localizer.reloadSampleQuestions(category);
             }
         },
 
@@ -991,6 +980,7 @@ export default {
         this.startNewChat();
         this.updateScrollbarThumb();
         document.addEventListener('visibilitychange', this.handleVisibilityChange);
+        addListener("selectedCategory", (category) => this.handleSelectCategory(category));
     },
     beforeUnmount() {
         document.removeEventListener('visibilitychange', this.handleVisibilityChange);
