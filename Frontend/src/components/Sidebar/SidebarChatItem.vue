@@ -81,7 +81,7 @@ export default {
         },
 
         canModify() {
-            return this.chat?.is_finished !== false;
+            return !this.isWorking();
         },
 
         isWorking() {

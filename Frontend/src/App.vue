@@ -135,7 +135,6 @@
             @action-confirmation-required="confirmActionDetails => handleConfirmAction(confirmActionDetails)"
             @api-key-required="apiKeyMessage => handleApiKey(apiKeyMessage)"
             @new-notification="response => createNotification(response)"
-            @chat-viewed="chatId => clearMissedChatResponse(chatId)"
             ref="content"
         />
     </div>
@@ -153,14 +152,14 @@ import OptionsSelect from "./components/OptionsSelect.vue";
 import {setColorTheme} from './ColorThemes.js';
 import CookieBanner from './components/CookieBanner.vue';
 import InputDialogue from './components/InputDialogue.vue';
-import {clearMissedChatResponse, markMissedChatResponse, showDesktopNotification} from "./browserNotifications.js";
+import {showDesktopNotification} from "./browserNotifications.js";
 
 export default {
     name: 'App',
     components: {OptionsSelect, MainContent, CookieBanner, Notifications, InputDialogue},
     setup() {
         const { isMobile } = useDevice();
-        return { conf, Localizer, isMobile, clearMissedChatResponse };
+        return { conf, Localizer, isMobile };
     },
     data() {
         return {
@@ -276,28 +275,6 @@ export default {
                 this.pendingNotification = false;
                 this.unreadNotifications += 1;
             }
-            if (response.type === "ChatFinishedMessage") {
-                if (response.show_system_notification) {
-                    showDesktopNotification(
-                        Localizer.get('notification_chatFinished'),
-                        {
-                            body: response.content || null,
-                            onClick: async () => this.handleOpenNotificationChat(response.chat_id),
-                        },
-                    );
-                }
-                markMissedChatResponse(response.chat_id);
-            }
-        },
-
-        handleVisibilityChange() {
-            if (document.hidden) return;
-
-            const content = this.$refs.content;
-            if (content?.selectedChatId && content.isMainContentVisible()) {
-                clearMissedChatResponse(content.selectedChatId);
-                content.clearMissedChatResponseIndicator(content.selectedChatId);
-            }
         },
 
         async showInfo(message) {
@@ -385,18 +362,12 @@ export default {
             );
         },
 
-        async handleOpenNotificationChat(chatId) {
-            await this.$refs.content.loadHistory(chatId);
-            this.$refs.content.$refs.textInputRef?.focus();
-            clearMissedChatResponse(chatId);
-        },
     },
 
     async mounted() {
         if (conf.ColorScheme !== "system") {
             this.setTheme(conf.ColorScheme);
         }
-        document.addEventListener('visibilitychange', this.handleVisibilityChange);
 
         // prevent options dropdown menu from closing once anything in it is clicked
         document.getElementById('options-menu')?.addEventListener('click', e => {
@@ -424,10 +395,6 @@ export default {
         // open permanent websocket connection to backend for "push notifications" to the UI
         this.$refs.content.connectWebsocket();
     },
-    beforeUnmount() {
-        document.removeEventListener('visibilitychange', this.handleVisibilityChange);
-        clearMissedChatResponse();
-    }
 }
 </script>
 

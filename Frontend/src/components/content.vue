@@ -212,6 +212,11 @@ import FilePreview from "./FilePreview.vue";
 import FileViewer from "./FileViewer.vue";
 import InputDialogue from "./InputDialogue.vue";
 import FileDropHandler from "./FileDropHandler.vue";
+import {
+    clearMissedChatResponse as clearTabMissedChatResponse,
+    markMissedChatResponse as markTabMissedChatResponse,
+    showDesktopNotification,
+} from "../browserNotifications.js";
 
 export default {
     name: 'main-content',
@@ -234,7 +239,6 @@ export default {
         'container-login-required',
         'api-key-required',
         'new-notification',
-        'chat-viewed',
     ],
     setup() {
         const { isMobile } = useDevice()
@@ -350,7 +354,7 @@ export default {
             await this.addChatBubble('', false, true);
             const aiBubble = this.getLastBubble();
             aiBubble.addStatusMessage('preparing', Localizer.get('chatbubble_preparing'), false);
-            this.$refs.sidebar.$refs.chats.clearChatMissed(chatId);
+            this.clearMissedChatResponse(chatId);
 
             // get chat response (intermediate results are streamed via websocket)
             try {
@@ -362,13 +366,7 @@ export default {
                 }
 
                 if (this.shouldNotifyChatResponse(chatId)) {
-                    this.$refs.sidebar.$refs.chats.markChatMissed(chatId);
-                    this.$emit('new-notification', {
-                        type: "ChatFinishedMessage",
-                        chat_id: chatId,
-                        content: this.createNotificationPreview(result.content),
-                        show_system_notification: this.shouldShowSystemChatNotification(),
-                    });
+                    this.markMissedChatResponse(chatId, result.content);
                 }
             } finally {
                 if (this.selectedChatId === chatId) {
@@ -398,6 +396,26 @@ export default {
 
         shouldShowSystemChatNotification() {
             return document.hidden || !document.hasFocus();
+        },
+
+        markMissedChatResponse(chatId, content) {
+            this.$refs.sidebar.$refs.chats.markChatMissed(chatId);
+            markTabMissedChatResponse(chatId);
+
+            if (this.shouldShowSystemChatNotification()) {
+                showDesktopNotification(
+                    Localizer.get('notification_chatFinished'),
+                    {
+                        body: this.createNotificationPreview(content) || null,
+                        onClick: async () => this.handleOpenMissedChatResponse(chatId),
+                    },
+                );
+            }
+        },
+
+        clearMissedChatResponse(chatId = null) {
+            this.$refs.sidebar.$refs.chats.clearChatMissed(chatId);
+            clearTabMissedChatResponse(chatId);
         },
 
         createNotificationPreview(content) {
@@ -831,8 +849,7 @@ export default {
                     this.selectedChatId = chatId;
                     this.newChat = false;
                     if (switchChat) {
-                        this.clearMissedChatResponseIndicator(chatId);
-                        this.$emit('chat-viewed', chatId);
+                        this.clearMissedChatResponse(chatId);
                     }
                 }
 
@@ -863,8 +880,18 @@ export default {
             this.$refs.textInputRef.focus();
         },
 
-        clearMissedChatResponseIndicator(chatId = null) {
-            this.$refs.sidebar.$refs.chats.clearChatMissed(chatId);
+        async handleOpenMissedChatResponse(chatId) {
+            await this.loadHistory(chatId);
+            this.$refs.textInputRef?.focus();
+            this.clearMissedChatResponse(chatId);
+        },
+
+        handleVisibilityChange() {
+            if (document.hidden) return;
+
+            if (this.selectedChatId && this.isMainContentVisible()) {
+                this.clearMissedChatResponse(this.selectedChatId);
+            }
         },
 
         async handleDeleteChat(chatId) {
@@ -963,6 +990,11 @@ export default {
     mounted() {
         this.startNewChat();
         this.updateScrollbarThumb();
+        document.addEventListener('visibilitychange', this.handleVisibilityChange);
+    },
+    beforeUnmount() {
+        document.removeEventListener('visibilitychange', this.handleVisibilityChange);
+        clearTabMissedChatResponse();
     },
     watch: {
         textInput() {
