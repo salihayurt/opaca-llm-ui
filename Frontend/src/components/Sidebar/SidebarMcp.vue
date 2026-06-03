@@ -50,9 +50,9 @@
                                     <i class="fa fa-wrench"/>
                                     <span class="position-absolute top-100 start-100 p-1 rounded-circle"
                                           :class="{
-                                              'bg-warning': mcp.approval === 'ask',
-                                              'bg-danger': mcp.approval === 'deny',
-                                              'bg-success': mcp.approval === 'allow'
+                                              'bg-approval-ask': mcp.approval === 'ask',
+                                              'bg-approval-deny': mcp.approval === 'deny',
+                                              'bg-approval-allow': mcp.approval === 'allow'
                                           }" style="outline: 2px solid var(--surface-color); transform: translate(-30%, -90%);">
                                         <span class="visually-hidden">Approval State</span>
                                     </span>
@@ -73,17 +73,17 @@
                                         <input type="radio" class="btn-check" :name="'approval-' + mcpServerIndex + '-' + mcpIndex" :id="'btn-ask-' + mcpServerIndex + '-' + mcpIndex" autocomplete="off"
                                             @change="e => setApproval(mcp.server_label, mcp.name, 'ask')"
                                             :checked="mcp.approval === 'ask'">
-                                        <label class="btn btn-outline-secondary mcp-approval-ask" :for="'btn-ask-' + mcpServerIndex + '-' + mcpIndex">Ask</label>
+                                        <label class="btn btn-outline-secondary approval-ask" :for="'btn-ask-' + mcpServerIndex + '-' + mcpIndex">Ask</label>
 
                                         <input type="radio" class="btn-check" :name="'approval-' + mcpServerIndex + '-' + mcpIndex" :id="'btn-deny-' + mcpServerIndex + '-' + mcpIndex" autocomplete="off"
                                             @change="e => setApproval(mcp.server_label, mcp.name, 'deny')"
                                             :checked="mcp.approval === 'deny'">
-                                        <label class="btn btn-outline-secondary mcp-approval-deny" :for="'btn-deny-' + mcpServerIndex + '-' + mcpIndex">Deny</label>
+                                        <label class="btn btn-outline-secondary approval-deny" :for="'btn-deny-' + mcpServerIndex + '-' + mcpIndex">Deny</label>
 
                                         <input type="radio" class="btn-check" :name="'approval-' + mcpServerIndex + '-' + mcpIndex" :id="'btn-allow-' + mcpServerIndex + '-' + mcpIndex" autocomplete="off"
                                             @change="e => setApproval(mcp.server_label, mcp.name, 'allow')"
                                             :checked="mcp.approval === 'allow'">
-                                        <label class="btn btn-outline-secondary mcp-approval-allow" :for="'btn-allow-' + mcpServerIndex + '-' + mcpIndex">Allow</label>
+                                        <label class="btn btn-outline-secondary approval-allow" :for="'btn-allow-' + mcpServerIndex + '-' + mcpIndex">Allow</label>
                                     </div>
                                 </div>
                             </div>
@@ -296,24 +296,6 @@ export default {
 
 .delete-icon:hover {
     color: var(--text-danger-color);
-}
-
-.btn-check:checked + .btn.btn-outline-secondary.mcp-approval-ask {
-    background-color: #ffc107;
-    border-color: #ffc107;
-    color: #fff;
-}
-
-.btn-check:checked + .btn.btn-outline-secondary.mcp-approval-deny {
-    background-color: #dc3545;
-    border-color: #dc3545;
-    color: #fff;
-}
-
-.btn-check:checked + .btn.btn-outline-secondary.mcp-approval-allow {
-    background-color: #198754;
-    border-color: #198754;
-    color: #fff;
 }
 
 </style>
