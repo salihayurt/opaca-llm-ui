@@ -37,8 +37,17 @@ class AbstractMethod(ABC):
     NAME: str
     CONFIG: type[MethodConfig]
 
-    def __init__(self, session: SessionData, streaming=False, internal_tools: InternalTools = None):
+    def __init__(
+            self,
+            session: SessionData,
+            chat: Chat,
+            response: QueryResponse,
+            streaming: bool = False,
+            internal_tools: InternalTools = None
+    ) -> None:
         self.session = session
+        self.chat = chat
+        self.response = response
         self.streaming = streaming
         self.tool_counter = count(0)
         self.internal_tools = internal_tools
@@ -51,7 +60,7 @@ class AbstractMethod(ABC):
         return self.session.get_config(self)
 
     @abstractmethod
-    async def query(self, message: str, chat: Chat) -> QueryResponse:
+    async def query(self) -> QueryResponse:
         pass
 
     def next_tool_id(self, agent_message: AgentMessage):
@@ -88,7 +97,7 @@ class AbstractMethod(ABC):
         """
 
         if status_message:
-            await self.send_to_websocket(StatusMessage(agent=agent, status=status_message))
+            await self.send_to_websocket(StatusMessage(agent=agent, status=status_message, chat_id=self.chat.chat_id))
 
         # Extract model name and config
         model = model_config.model
@@ -140,8 +149,10 @@ class AbstractMethod(ABC):
         stream = await litellm.aresponses_api_with_mcp(**kwargs)
         async for event in stream:
 
-            # Check if an "abort" message has been sent by the user
-            if self.session.abort_sent:
+            # Abort the response generation for a specific chat,
+            # or for all notifications and other anonymous queries at once.
+            if (self.chat.is_aborted
+                    or (self.chat.chat_id == '' and self.session.is_notifs_aborted)):
                 raise OpacaException(
                     user_message="(The generation of the response has been stopped.)",
                     error_message="Completion generation aborted by user. See Debug/Logging Tab to see what has been done so far."
@@ -168,15 +179,17 @@ class AbstractMethod(ABC):
                         tool = ToolCall(name=event.item.name, type="mcp", id=self.next_tool_id(agent_message), args={}, result=event.item.output)
                     agent_message.tools.append(tool)
                     # Stream the tool call and the result
-                    await self.send_to_websocket(ToolCallMessage(id=tool.id, name=tool.name, args=tool.args, agent=agent))
-                    await self.send_to_websocket(ToolResultMessage(id=tool.id, result=tool.result))
+                    await self.send_to_websocket(ToolCallMessage(id=tool.id, name=tool.name, args=tool.args, agent=agent, chat_id=self.chat.chat_id))
+                    await self.send_to_websocket(ToolResultMessage(id=tool.id, result=tool.result, chat_id=self.chat.chat_id))
 
             # Plain text chunk received
             elif event.type == event_type.OUTPUT_TEXT_DELTA:
                 if tool_choice == "only":
                     break
                 agent_message.content += event.delta
-                await self.send_to_websocket(TextChunkMessage(id=agent_message.id, agent=agent, chunk=event.delta, is_output=is_output))
+                await self.send_to_websocket(TextChunkMessage(id=agent_message.id, agent=agent, chunk=event.delta, is_output=is_output, chat_id=self.chat.chat_id))
+                if event.delta and is_output:
+                    self.response.content += event.delta
 
             # Final message received
             elif event.type == event_type.RESPONSE_COMPLETED:
@@ -208,7 +221,7 @@ class AbstractMethod(ABC):
                             logger.warning(f"Could not parse tool arguments: {t.arguments}")
                             tool = ToolCall(name=t.name, type=tool_type, id=self.next_tool_id(agent_message), args={})
                         agent_message.tools.append(tool)
-                        await self.send_to_websocket(ToolCallMessage(id=tool.id, name=tool.name, args=tool.args, agent=agent))
+                        await self.send_to_websocket(ToolCallMessage(id=tool.id, name=tool.name, args=tool.args, agent=agent, chat_id=self.chat.chat_id))
                 # Capture token usage
                 agent_message.response_metadata = event.response.usage.model_dump()
 
@@ -219,6 +232,7 @@ class AbstractMethod(ABC):
             agent=agent,
             execution_time=agent_message.execution_time,
             metrics=agent_message.response_metadata,
+            chat_id=self.chat.chat_id,
         ))
 
         logger.info(agent_message.content or agent_message.tools or agent_message.formatted_output, extra={"agent_name": agent})
@@ -239,33 +253,30 @@ class AbstractMethod(ABC):
         """
         # MCP Tool Execution Flow
         if tool.type == "mcp":
-            server_label, mcp_action_name = tool.name.split('--', maxsplit=1)
+            async def create_result(result):
+                await self.send_to_websocket(ToolResultMessage(id=tool.id, result=result, chat_id=self.chat.chat_id))
+                return ToolCall(id=tool.id, type="mcp", name=tool.name, args=tool.args, result=result)
+
+            server_label, tool_name = tool.name.split('--', maxsplit=1)
             server = self.session.mcp_servers.get(server_label)
             if not server:
-                t_result = f"MCP Server '{server_label}' not found."
-                await self.send_to_websocket(ToolResultMessage(id=tool.id, result=t_result))
-                return ToolCall(id=tool.id, type="mcp", name=tool.name, args=tool.args, result=t_result)
+                return await create_result(f"MCP Server '{server_label}' not found.")
             
-            mcp_tool = server.tools.get(tool.name)
+            mcp_tool = server.tools.get(tool_name)
             if not mcp_tool:
-                t_result = f"Tool '{tool.name}' not found on MCP Server '{server_label}'."
-                await self.send_to_websocket(ToolResultMessage(id=tool.id, result=t_result))
-                return ToolCall(id=tool.id, type="mcp", name=tool.name, args=tool.args, result=t_result)
+                return await create_result(f"Tool '{tool.name}' not found on MCP Server '{server_label}'.")
 
             if mcp_tool.approval == 'deny':
-                t_result = "Execution denied by user settings, do not attempt again."
-                await self.send_to_websocket(ToolResultMessage(id=tool.id, result=t_result))
-                return ToolCall(id=tool.id, type="mcp", name=tool.name, args=tool.args, result=t_result)
-
+                # Should not happen due to filtering in get_tools, but double-checking approval status just in case it changes in the future
+                return await create_result("Execution denied by user settings, do not attempt again.")
+                
             if mcp_tool.approval == 'ask':
-                if not await self.check_confirmation(tool.name, tool.args, force_ask=True):
-                    t_result = "Execution declined by user, do not attempt again."
-                    await self.send_to_websocket(ToolResultMessage(id=tool.id, result=t_result))
-                    return ToolCall(id=tool.id, type="mcp", name=tool.name, args=tool.args, result=t_result)
+                if not await self.check_confirmation(mcp_tool.name, tool.args, force_ask=True):
+                    return await create_result("Execution declined by user, do not attempt again.")
 
             try:
                 client = MCPClient(server_url=server.params.server_url)
-                res = await client.call_tool(CallToolRequestParams(name=mcp_action_name, arguments=tool.args))
+                res = await client.call_tool(CallToolRequestParams(name=tool_name, arguments=tool.args))
                 
                 if res.isError:
                     t_result = f"Execution failed. Error: {res.content}"
@@ -274,8 +285,7 @@ class AbstractMethod(ABC):
             except Exception as e:
                 t_result = f"Failed to invoke MCP tool.\nCause: {e}"
 
-            await self.send_to_websocket(ToolResultMessage(id=tool.id, result=t_result))
-            return ToolCall(id=tool.id, type="mcp", name=tool.name, args=tool.args, result=t_result)
+            return await create_result(t_result)
 
         # OPACA Tool Execution Flow
         else:
