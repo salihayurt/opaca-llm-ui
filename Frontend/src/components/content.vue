@@ -449,7 +449,6 @@ export default {
         },
 
         async handleFileSelection(event) {
-            console.log("Pressed button ", event);
             try {
                 await this.handleFiles(event.target.files);
             } finally {

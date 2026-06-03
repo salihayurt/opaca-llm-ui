@@ -1,10 +1,26 @@
-const missedResponseChatIds = new Set();
-const notificationFavicons = {
+import { isBrowserDarkTheme } from "./ColorThemes.js";
+
+type DesktopNotificationClickHandler = (
+    event: Event,
+    notification: Notification,
+) => void | Promise<void>;
+
+interface DesktopNotificationOptions {
+    body?: string | null;
+    onClick?: DesktopNotificationClickHandler | null;
+    focusWindowOnClick?: boolean;
+}
+
+const missedResponseChatIds = new Set<string>();
+const notificationFavicons: Record<"light" | "dark", string> = {
     light: "/sage-logo-small-light-notification.png",
     dark: "/sage-logo-small-dark-notification.png",
 };
 
-export async function showDesktopNotification(title, {body = null, onClick = null, focusWindowOnClick = true} = {}) {
+export async function showDesktopNotification(
+    title: string,
+    {body = null, onClick = null, focusWindowOnClick = true}: DesktopNotificationOptions = {},
+): Promise<Notification | null> {
     if (typeof window === "undefined" || !("Notification" in window)) return null;
 
     const permission = Notification.permission === "default"
@@ -26,13 +42,13 @@ export async function showDesktopNotification(title, {body = null, onClick = nul
     return notification;
 }
 
-export function markMissedChatResponse(chatId) {
+export function markMissedChatResponse(chatId: string | null | undefined): void {
     if (!chatId) return;
     missedResponseChatIds.add(chatId);
     updateTabNotificationFavicon();
 }
 
-export function clearMissedChatResponse(chatId = null) {
+export function clearMissedChatResponse(chatId: string | null = null): void {
     if (chatId) {
         missedResponseChatIds.delete(chatId);
     } else {
@@ -41,11 +57,11 @@ export function clearMissedChatResponse(chatId = null) {
     updateTabNotificationFavicon();
 }
 
-function updateTabNotificationFavicon() {
+function updateTabNotificationFavicon(): void {
     if (typeof document === "undefined") return;
 
     const hasMissedResponse = missedResponseChatIds.size > 0;
-    const icons = document.querySelectorAll('link[rel~="icon"]');
+    const icons = document.querySelectorAll<HTMLLinkElement>('link[rel~="icon"]');
 
     if (!hasMissedResponse) {
         icons.forEach(icon => {
@@ -65,14 +81,9 @@ function updateTabNotificationFavicon() {
     });
 }
 
-function getNotificationFavicon(icon) {
+function getNotificationFavicon(icon: HTMLLinkElement): string {
     const media = icon?.media?.toLowerCase() ?? "";
     if (media.includes("prefers-color-scheme: dark")) return notificationFavicons.dark;
     if (media.includes("prefers-color-scheme: light")) return notificationFavicons.light;
     return isBrowserDarkTheme() ? notificationFavicons.dark : notificationFavicons.light;
-}
-
-function isBrowserDarkTheme() {
-    return typeof window !== "undefined"
-        && window.matchMedia("(prefers-color-scheme: dark)").matches;
 }
