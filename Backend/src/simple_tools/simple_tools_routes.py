@@ -70,11 +70,7 @@ class SimpleToolsMethod(AbstractMethod):
 
                 tasks = []
                 for call in result.tools:
-                    if call.type == "mcp":
-                        tasks.append(self.invoke_mcp_tool(call.name, call.args, call.id))
-                    else:
-                        tasks.append(self.invoke_opaca_tool(call.name, call.args, call.id))
-
+                    tasks.append(self.invoke_tool(call))
                 tool_entries = await asyncio.gather(*tasks)
 
                 tool_contents = "\n".join(

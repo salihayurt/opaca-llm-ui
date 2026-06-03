@@ -528,10 +528,7 @@ Please address these specific improvements:
     async def invoke_tools(self, agent: WorkerAgent, task_str: str, message: AgentMessage) -> AgentResult:
         tasks = []
         for tool in message.tools:
-            if tool.type == 'mcp':
-                tasks.append(self.invoke_mcp_tool(tool.name, tool.args, tool.id))
-            else:
-                tasks.append(self.invoke_opaca_tool(tool.name, tool.args, tool.id))
+            tasks.append(self.invoke_tool(tool))
                 
         tool_results = await asyncio.gather(*tasks)
         message.tools = tool_results        

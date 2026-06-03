@@ -111,10 +111,7 @@ class SimpleMethod(AbstractMethod):
 
                 tool.id = self.next_tool_id(result)
                 await self.send_to_websocket(ToolCallMessage(id=tool.id, name=tool.name, args=tool.args, agent="assistant"))
-                if tool.type == "mcp":
-                    tool_call = await self.invoke_mcp_tool(tool.name, tool.args, tool.id)
-                else:
-                    tool_call = await self.invoke_opaca_tool(tool.name, tool.args, tool.id)
+                tool_call = await self.invoke_tool(tool)
                 response.agent_messages.append(AgentMessage(
                     agent="assistant",
                     content=f"\nThe result of this step was: {tool_call.result}",

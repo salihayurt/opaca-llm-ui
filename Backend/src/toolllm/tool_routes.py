@@ -131,11 +131,7 @@ class ToolLLMMethod(AbstractMethod):
             # Check if opaca and mcp tools were generated and if so, execute them by calling the opaca-proxy
             tasks = []
             for i, call in enumerate(result.tools):
-                if call.type == "opaca":
-                    tasks.append(self.invoke_opaca_tool(call.name, call.args, call.id))
-                elif call.type == "mcp":
-                    tasks.append(self.invoke_mcp_tool(call.name, call.args, call.id))
-
+                tasks.append(self.invoke_tool(call))
             result.tools = await asyncio.gather(*tasks)
 
             called_tools[c_it] = self._build_tool_desc(c_it, result.tools)
