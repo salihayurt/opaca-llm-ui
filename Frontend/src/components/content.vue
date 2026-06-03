@@ -230,6 +230,7 @@ export default {
         connected: Boolean,
     },
     emits: [
+        'action-confirmation-required',
         'container-login-required',
         'api-key-required',
         'new-notification',
@@ -351,7 +352,7 @@ export default {
 
             // get chat response (intermediate results are streamed via websocket)
             try {
-                const result = await backendClient.query(chatId, this.method, userText, true, 5*60*1000);
+                const result = await backendClient.query(chatId, conf.method, userText, true, 5*60*1000);
 
                 // display final result
                 if (this.selectedChatId === chatId) {
