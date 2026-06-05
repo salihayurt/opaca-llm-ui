@@ -106,6 +106,7 @@ export default {
         getTooltip() {
             return `ID: ${this.chat.chat_id}\n` + 
                    //`Responses: ${this.chat.responses.length}\n` +  // XXX shows as zero?
+                   `Active files: ${this.chat.active_files.length || "none"}\n` +
                    `Created: ${Localizer.toLocaleString(this.chat.time_created)}\n` +
                    `Modified: ${Localizer.toLocaleString(this.chat.time_modified)}`;
         },
