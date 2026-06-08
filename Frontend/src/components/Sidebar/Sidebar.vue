@@ -116,7 +116,6 @@
                 <SidebarQuestions
                     v-show="SidebarManager.isViewSelected('questions')"
                     @select-question="question => this.$emit('select-question', question)"
-                    @select-category="category => this.$emit('select-category', category)"
                     ref="questions"
                 />
 
@@ -144,7 +143,6 @@
                 <!-- method config -->
                 <SidebarConfig
                     v-show="SidebarManager.isViewSelected('config')"
-                    :method="this.method"
                     ref="config"
                 />
 
@@ -171,7 +169,6 @@
 import conf from '../../../config.js'
 import { useDevice } from "../../useIsMobile.js";
 import SidebarManager from "../../SidebarManager.js";
-import Cookie from "js-cookie";
 import Localizer from "../../Localizer.js";
 import SidebarQuestions from './SidebarQuestions.vue';
 import SidebarAgents from "./SidebarAgents.vue";
@@ -199,15 +196,12 @@ export default {
         SidebarQuestions,
     },
     props: {
-        method: String,
-        language: String,
         connected: Boolean,
         selectedChatId: String,
         isFinished: Boolean,
     },
     emits: [
         'select-question',
-        'select-category',
         'select-chat',
         'delete-chat',
         'rename-chat',
@@ -225,14 +219,14 @@ export default {
     },
     data() {
         return {
-            sidebarCollapsed: true,
+            sidebarCollapsed: conf.sidebarCollapsed,
             sidebarToggleHovered: false,
         };
     },
     methods: {
         toggleSidebar() {
-            this.sidebarCollapsed = !this.sidebarCollapsed;
-            Cookie.set('sidebar_collapsed', this.sidebarCollapsed);
+            conf.sidebarCollapsed = !conf.sidebarCollapsed;
+            this.sidebarCollapsed = conf.sidebarCollapsed; // needed for auto-update
 
             // Close view if it is now hidden
             const view = this.SidebarManager.getSelectedView();
@@ -242,28 +236,27 @@ export default {
         },
 
         getSidebarToggleIcon() {
-            if (this.sidebarCollapsed) return 'fa-angle-down';
+            if (conf.sidebarCollapsed) return 'fa-angle-down';
             if (this.sidebarToggleHovered) return 'fa-angle-up';
             return 'fa-minus';
         },
 
         getSidebarToggleTooltip() {
-            if (this.sidebarCollapsed) return Localizer.get('sidebar_showAdvancedTools');
+            if (conf.sidebarCollapsed) return Localizer.get('sidebar_showAdvancedTools');
             return Localizer.get('sidebar_showStandardTools');
         },
 
         setupResizer() {
             const resizer = document.getElementById('resizer');
             const sidebar = document.getElementById('sidebar-content');
-            let isResizing = false;
 
             resizer.addEventListener('mousedown', (e) => {
-                isResizing = true;
+                SidebarManager.setResizing(true);
                 document.body.style.cursor = 'ew-resize';
             });
 
             document.addEventListener('mousemove', (event) => {
-                if (!isResizing) return;
+                if (!SidebarManager.isResizing()) return;
 
                 // Calculate the new width for the aside
                 const newWidth = event.clientX - sidebar.getBoundingClientRect().left;
@@ -274,7 +267,7 @@ export default {
             });
 
             document.addEventListener('mouseup', () => {
-                isResizing = false;
+                SidebarManager.setResizing(false);
                 document.body.style.cursor = 'default';
             });
         },
@@ -283,13 +276,10 @@ export default {
     mounted() {
         this.setupResizer();
 
-        this.sidebarCollapsed = Cookie.get('sidebar_collapsed') !== 'false';
-
         if (this.isMobile) {
             SidebarManager.close()
         } else {
-            const selectedView = Cookie.get('selected_view') ?? conf.DefaultSidebarView;
-            SidebarManager.selectView(selectedView, this.sidebarCollapsed);
+            SidebarManager.selectView(conf.selectedSidebar, conf.sidebarCollapsed);
         }
     },
 }

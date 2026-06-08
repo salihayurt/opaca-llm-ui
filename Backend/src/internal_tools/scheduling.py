@@ -73,7 +73,7 @@ class ScheduledTaskTools:
         return ceil((next_time - current).total_seconds())
 
     def create_task_id(self) -> int:
-        return max(self.ctx.session.scheduled_tasks, default=-1) + 1
+        return self.ctx.session.create_scheduled_task_id()
 
     async def deferred_execution_helper(
         self,
@@ -124,7 +124,8 @@ class ScheduledTaskTools:
                 result = await self.ctx.query(query_ext)
             except Exception as e:
                 logger.error(f"Scheduled task {task_id} failed:SCHEDULED TASK FAILED: {e}")
-                result = QueryResponse.from_exception(query, e)
+                result = QueryResponse(query=query)
+                result.make_error_response(e)
 
             # Clean mapping
             session.prune_notifications_chats_map()
