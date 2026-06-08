@@ -251,6 +251,7 @@ export default {
             autoScrollEnabled: true,
             socket: null,
             viewerFile: null,
+            windowIsFocused: true,
         }
     },
     methods: {
@@ -384,11 +385,12 @@ export default {
         shouldNotifyChatResponse(chatId) {
             return !(chatId === this.selectedChatId
                 && !document.hidden
+                && this.windowIsFocused
                 && this.isMainContentVisible());
         },
 
         shouldShowSystemChatNotification() {
-            return document.hidden || !document.hasFocus();
+            return document.hidden || !document.hasFocus() || ! this.windowIsFocused;
         },
 
         markMissedChatResponse(chatId, content) {
@@ -980,6 +982,8 @@ export default {
         this.startNewChat();
         this.updateScrollbarThumb();
         document.addEventListener('visibilitychange', this.handleVisibilityChange);
+        window.addEventListener('focus', () => { this.windowIsFocused = true; });
+        window.addEventListener('blur',  () => { this.windowIsFocused = false; });
         addListener("selectedCategory", (category) => this.handleSelectCategory(category));
     },
     beforeUnmount() {
