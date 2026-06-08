@@ -21,7 +21,7 @@ from starlette.datastructures import Headers
 from openai import OpenAI
 
 from . import sample_prompts as prompts
-from .models import ConnectRequest, ToolApproval, QueryRequest, QueryResponse, ConfigPayload, Chat, RestrictedActions, \
+from .models import ConnectRequest, ToolApprovalMessage, QueryRequest, QueryResponse, ConfigPayload, Chat, RestrictedActions, \
     SearchResult, get_supported_models, SessionData, OpacaException, MCPCreateMessage, PushMessage, \
     InvokeRequest, InvokeResponse, SessionPrompts, ReloadChatsMessage
 from .simple import SimpleMethod
@@ -232,7 +232,7 @@ async def get_container_approvals(container_id: str, session: SessionData = Depe
 
 
 @app.patch("/containers/{container_id}/approval", description="Update tool approval for a specific tool inside a container.", tags=["opaca"])
-async def update_container_approval(container_id: str, data: ToolApproval, session: SessionData = Depends(handle_session_http)) -> Response:
+async def update_container_approval(container_id: str, data: ToolApprovalMessage, session: SessionData = Depends(handle_session_http)) -> Response:
     session.set_opaca_tool_approval(container_id, data.tool_name, data.approval)
     return Response(status_code=204)
 
@@ -283,7 +283,7 @@ async def delete_mcp_server(server_label: str, session: SessionData = Depends(ha
         return Response(status_code=404, content="No matching mcp server found!")
 
 @app.patch("/mcp/{server_label}/approval", description="Set whether a tool call should be allowed, denied, or require confirmation by the user.", tags=["mcp"])
-async def update_mcp_tool_approval(data: ToolApproval, server_label: str, session: SessionData = Depends(handle_session_http)) -> Response:
+async def update_mcp_tool_approval(data: ToolApprovalMessage, server_label: str, session: SessionData = Depends(handle_session_http)) -> Response:
     await session.set_mcp_tool_approval(server_label, data.tool_name, data.approval)
     return Response(status_code=204)
 

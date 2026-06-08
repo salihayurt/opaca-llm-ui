@@ -631,7 +631,7 @@ class MCPCreateMessage(BaseModel):
     content: Dict[str, Any]
 
 
-class ToolApproval(BaseModel):
+class ToolApprovalMessage(BaseModel):
     tool_name: str
     approval: ApprovalState
 
