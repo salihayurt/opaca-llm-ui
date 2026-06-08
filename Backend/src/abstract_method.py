@@ -18,7 +18,7 @@ from litellm.types.responses.main import OutputFunctionToolCall
 from litellm.types.llms.openai import ResponsesAPIStreamEvents as event_type
 from mcp.types import CallToolRequestParams
 
-from .models import (ApprovalState, SessionData, QueryResponse, AgentMessage, ChatMessage, OpacaException, Chat,
+from .models import (ToolApprovalState, SessionData, QueryResponse, AgentMessage, ChatMessage, OpacaException, Chat,
                      ToolCall, ContainerLoginNotification, ContainerLoginResponse, ToolCallMessage,
                      ToolResultMessage, TextChunkMessage, MetricsMessage, StatusMessage, MethodConfig,
                      MissingApiKeyNotification, MissingApiKeyResponse, ConfirmActionNotification, ConfirmActionResponse,
@@ -68,16 +68,16 @@ class AbstractMethod(ABC):
         return f"{agent_message.id}/{next(self.tool_counter)}"
 
     @staticmethod
-    def _resolve_tool_approval(tool_name: str, user_approval: ApprovalState) -> ApprovalState:
+    def _resolve_tool_approval(tool_name: str, user_approval: ToolApprovalState) -> ToolApprovalState:
         if any(x.lower() in tool_name.lower() for x in actions_blacklist):
             # First the admin blacklist is applied
-            return ApprovalState.DENY
-        if user_approval == ApprovalState.DENY:
+            return ToolApprovalState.DENY
+        if user_approval == ToolApprovalState.DENY:
             # Then the user's approval setting for the tool
-            return ApprovalState.DENY
+            return ToolApprovalState.DENY
         if any(x.lower() in tool_name.lower() for x in actions_needing_confirmation):
             # Then the admin confirmation list
-            return ApprovalState.ASK
+            return ToolApprovalState.ASK
         # Then either the users ask or allow
         return user_approval
 
@@ -278,9 +278,9 @@ class AbstractMethod(ABC):
                 self.session.get_opaca_tool_approval(tool_name),
             )
 
-            if approval_state == ApprovalState.DENY:
+            if approval_state == ToolApprovalState.DENY:
                 return ToolCall(id=tool_id, type="opaca", name=tool_name, args=tool_args, result="Execution denied by user settings, do not attempt again.")
-            if approval_state == ApprovalState.ASK:
+            if approval_state == ToolApprovalState.ASK:
                 if not await self.check_confirmation(tool_name, tool_args, force_ask=True):
                     return ToolCall(id=tool_id, type="opaca", name=tool_name, args=tool_args, result="Execution declined by user, do not attempt again.")
 
@@ -320,11 +320,11 @@ class AbstractMethod(ABC):
             return await create_result(f"Tool '{full_tool_name}' not found on MCP Server '{server_label}'.")
 
         approval_state = self._resolve_tool_approval(full_tool_name, tool.approval)
-        if approval_state == ApprovalState.DENY:
+        if approval_state == ToolApprovalState.DENY:
             # Should not happen due to filtering in get_tools, but double-checking approval status just in case it changes in the future
             return await create_result("Execution denied by user settings, do not attempt again.")
             
-        if approval_state == ApprovalState.ASK:
+        if approval_state == ToolApprovalState.ASK:
             if not await self.check_confirmation(full_tool_name, tool_args, force_ask=True):
                 return await create_result("Execution declined by user, do not attempt again.")
 
@@ -353,7 +353,7 @@ class AbstractMethod(ABC):
         # Filter out OPACA tools if user denied OR if it hits the admin blacklist
         tools = [
             t for t in tools 
-            if self.session.get_opaca_tool_approval(t["name"]) != ApprovalState.DENY
+            if self.session.get_opaca_tool_approval(t["name"]) != ToolApprovalState.DENY
             and not any(x.lower() in t["name"].lower() for x in actions_blacklist)
         ]
 
@@ -363,7 +363,7 @@ class AbstractMethod(ABC):
                 tool.cast_to_openai_tool()
                 for server in self.session.mcp_servers.values()
                 for tool in server.tools.values()
-                if tool.approval != ApprovalState.DENY
+                if tool.approval != ToolApprovalState.DENY
                 and not any(x.lower() in tool.name.lower() for x in actions_blacklist)
             ]
             tools.extend(mcp_tools)
