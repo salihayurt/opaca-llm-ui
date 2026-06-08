@@ -164,24 +164,6 @@ class AbstractMethod(ABC):
                     error_message=f"{event.response.error['code']}: {event.response.error['message']}"
                 )
 
-            elif event.type == event_type.OUTPUT_ITEM_DONE:
-                if event.item.type == "mcp_call":
-                    try:
-                        tool = ToolCall(
-                            name=f'{event.item.server_label}--{event.item.name}',
-                            type="mcp",
-                            id=self.next_tool_id(agent_message),
-                            args=json.loads(event.item.arguments),
-                            result=event.item.output
-                        )
-                    except json.JSONDecodeError:
-                        logger.warning(f"Could not parse mcp tool arguments: {event.item.arguments}")
-                        tool = ToolCall(name=event.item.name, type="mcp", id=self.next_tool_id(agent_message), args={}, result=event.item.output)
-                    agent_message.tools.append(tool)
-                    # Stream the tool call and the result
-                    await self.send_to_websocket(ToolCallMessage(id=tool.id, name=tool.name, args=tool.args, agent=agent, chat_id=self.chat.chat_id))
-                    await self.send_to_websocket(ToolResultMessage(id=tool.id, result=tool.result, chat_id=self.chat.chat_id))
-
             # Plain text chunk received
             elif event.type == event_type.OUTPUT_TEXT_DELTA:
                 if tool_choice == "only":
