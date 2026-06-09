@@ -46,7 +46,17 @@
                                     :data-bs-target="'#mcp-body-' + mcpServerIndex + '-' + mcpIndex"
                                     aria-expanded="false"
                                     :aria-controls="'mcp-body-' + mcpServerIndex + '-' + mcpIndex">
-                                <i class="fa fa-wrench me-3"/>
+                                <div class="position-relative d-inline-block me-3">
+                                    <i class="fa fa-wrench"/>
+                                    <span class="position-absolute top-100 start-100 p-1 rounded-circle"
+                                          :class="{
+                                              'bg-warning': getEffectiveApproval(mcp) === 'ask',
+                                              'bg-danger': getEffectiveApproval(mcp) === 'deny',
+                                              'bg-success': getEffectiveApproval(mcp) === 'allow'
+                                          }" style="outline: 2px solid var(--surface-color); transform: translate(-30%, -90%);">
+                                        <span class="visually-hidden">Approval State</span>
+                                    </span>
+                                </div>
                                 {{ mcp.name }}
                             </button>
 
@@ -62,17 +72,20 @@
                                     <div class="btn-group btn-group-sm w-100" role="group">
                                         <input type="radio" class="btn-check" :name="'approval-' + mcpServerIndex + '-' + mcpIndex" :id="'btn-ask-' + mcpServerIndex + '-' + mcpIndex" autocomplete="off"
                                             @change="e => setApproval(mcp.server_label, mcp.name, 'ask')"
-                                            :checked="mcp.approval === 'ask'">
+                                            :checked="getEffectiveApproval(mcp) === 'ask'"
+                                            :disabled="isForbiddenApplied(mcp)">
                                         <label class="btn btn-outline-secondary mcp-approval-ask" :for="'btn-ask-' + mcpServerIndex + '-' + mcpIndex">Ask</label>
 
                                         <input type="radio" class="btn-check" :name="'approval-' + mcpServerIndex + '-' + mcpIndex" :id="'btn-deny-' + mcpServerIndex + '-' + mcpIndex" autocomplete="off"
                                             @change="e => setApproval(mcp.server_label, mcp.name, 'deny')"
-                                            :checked="mcp.approval === 'deny'">
+                                            :checked="getEffectiveApproval(mcp) === 'deny'"
+                                            :disabled="isForbiddenApplied(mcp)">
                                         <label class="btn btn-outline-secondary mcp-approval-deny" :for="'btn-deny-' + mcpServerIndex + '-' + mcpIndex">Deny</label>
 
                                         <input type="radio" class="btn-check" :name="'approval-' + mcpServerIndex + '-' + mcpIndex" :id="'btn-allow-' + mcpServerIndex + '-' + mcpIndex" autocomplete="off"
                                             @change="e => setApproval(mcp.server_label, mcp.name, 'allow')"
-                                            :checked="mcp.approval === 'allow'">
+                                            :checked="getEffectiveApproval(mcp) === 'allow'"
+                                            :disabled="isForbiddenApplied(mcp) || isConfirmationApplied(mcp)">
                                         <label class="btn btn-outline-secondary mcp-approval-allow" :for="'btn-allow-' + mcpServerIndex + '-' + mcpIndex">Allow</label>
                                     </div>
                                 </div>
@@ -101,6 +114,7 @@ import Localizer from "../../Localizer.js";
 import { useDevice } from "../../useIsMobile.js";
 import backendClient from "../../utils.js";
 import InputDialogue from '../InputDialogue.vue';
+import { getEffectiveApproval, isConfirmationTool, isForbiddenTool } from '../../approvalUtils.js';
 
 export default {
     name: 'SidebarMcp',
@@ -117,15 +131,23 @@ export default {
             platformMcp: null,
             isLoading: false,
             searchQuery: '',
+            restrictedActions: { forbidden: [], need_confirmation: [] },
         };
     },
     methods: {
         async updateMcp(isPlatformConnected) {
             this.isLoading = true;
-            this.platformMcp = isPlatformConnected
-                ? await backendClient.getMCPs()
-                : null;
-            this.isLoading = false;
+            try {
+                if (!isPlatformConnected) {
+                    this.platformMcp = null;
+                    this.restrictedActions = { forbidden: [], need_confirmation: [] };
+                    return;
+                }
+                this.restrictedActions = await backendClient.getRestrictedActions();
+                this.platformMcp = await backendClient.getMCPs();
+            } finally {
+                this.isLoading = false;
+            }
         },
 
         async addMcp() {
@@ -187,8 +209,32 @@ export default {
                 }, {});
         },
 
+        getEffectiveApproval(mcp) {
+            return getEffectiveApproval(`${mcp.server_label}--${mcp.name}`, mcp.approval, this.restrictedActions);
+        },
+
+        isForbiddenApplied(mcp) {
+            return isForbiddenTool(`${mcp.server_label}--${mcp.name}`, this.restrictedActions);
+        },
+
+        isConfirmationApplied(mcp) {
+            return isConfirmationTool(`${mcp.server_label}--${mcp.name}`, this.restrictedActions);
+        },
+
         async setApproval(serverLabel, toolName, approval) {
-            await backendClient.setMcpToolApproval(serverLabel, toolName, approval);
+            try {
+                await backendClient.setMcpToolApproval(serverLabel, toolName, approval);
+
+                for (const server in this.platformMcp) {
+                    const tool = this.platformMcp[server].find(t => t.server_label === serverLabel && t.name === toolName);
+                    if (tool) {
+                        tool.approval = approval;
+                        break;
+                    }
+                }
+            } catch (err) {
+                console.error("Failed to update approval", err);
+            }
         },
 
         isValidInput(s_url, s_label) {
@@ -274,14 +320,14 @@ export default {
 }
 
 .btn-check:checked + .btn.btn-outline-secondary.mcp-approval-ask {
-    background-color: var(--primary-color, #0d6efd);
-    border-color: var(--primary-color, #0d6efd);
+    background-color: #ffc107;
+    border-color: #ffc107;
     color: #fff;
 }
 
 .btn-check:checked + .btn.btn-outline-secondary.mcp-approval-deny {
-    background-color: var(--text-danger-color, #dc3545);
-    border-color: var(--text-danger-color, #dc3545);
+    background-color: #dc3545;
+    border-color: #dc3545;
     color: #fff;
 }
 

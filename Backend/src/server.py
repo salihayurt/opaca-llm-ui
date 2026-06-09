@@ -21,8 +21,8 @@ from starlette.datastructures import Headers
 from openai import OpenAI
 
 from . import sample_prompts as prompts
-from .models import ConnectRequest, MCPToolApproval, QueryRequest, QueryResponse, ConfigPayload, Chat, RestrictedActions, \
-    SearchResult, get_supported_models, SessionData, OpacaException, MCPCreateMessage, PushMessage, \
+from .models import ConnectRequest, ToolApprovalUpdateRequest, QueryRequest, QueryResponse, ConfigPayload, Chat, RestrictedActions, \
+    SearchResult, get_supported_models, SessionData, OpacaException, MCPCreateRequest, PushMessage, \
     InvokeRequest, InvokeResponse, SessionPrompts, ReloadChatsMessage
 from .simple import SimpleMethod
 from .simple_tools import SimpleToolsMethod
@@ -226,6 +226,17 @@ async def delete_container(container_id: str, session: SessionData = Depends(han
     await session.opaca_client.stop_container(container_id)
 
 
+@app.get("/containers/{container_id}/approval", description="Get per-tool approvals for a specific container.", tags=["opaca"])
+async def get_container_approvals(container_id: str, session: SessionData = Depends(handle_session_http)) -> dict:
+    return session.opaca_approvals.get(container_id, {})
+
+
+@app.patch("/containers/{container_id}/approval", description="Update tool approval for a specific tool inside a container.", tags=["opaca"])
+async def update_container_approval(container_id: str, data: ToolApprovalUpdateRequest, session: SessionData = Depends(handle_session_http)) -> Response:
+    session.set_opaca_tool_approval(container_id, data.tool_name, data.approval)
+    return Response(status_code=204)
+
+
 @app.post("/invoke", description="Invoke OPACA action directly.", tags=["opaca"])
 async def invoke_action(invoke: InvokeRequest, session: SessionData = Depends(handle_session_http)) -> InvokeResponse:
     try:
@@ -259,7 +270,7 @@ async def get_mcp_list(session: SessionData = Depends(handle_session_http)) -> D
 
 
 @app.post("/mcp", description="Add a new MCP server to the list of available MCP servers", tags=["mcp"])
-async def add_mcp_server(mcp: MCPCreateMessage, session: SessionData = Depends(handle_session_http)) -> Response:
+async def add_mcp_server(mcp: MCPCreateRequest, session: SessionData = Depends(handle_session_http)) -> Response:
     await session.add_mcp_server(mcp.content)
     return Response(status_code=201)
 
@@ -272,7 +283,7 @@ async def delete_mcp_server(server_label: str, session: SessionData = Depends(ha
         return Response(status_code=404, content="No matching mcp server found!")
 
 @app.patch("/mcp/{server_label}/approval", description="Set whether a tool call should be allowed, denied, or require confirmation by the user.", tags=["mcp"])
-async def update_mcp_tool_approval(data: MCPToolApproval, server_label: str, session: SessionData = Depends(handle_session_http)) -> Response:
+async def update_mcp_tool_approval(data: ToolApprovalUpdateRequest, server_label: str, session: SessionData = Depends(handle_session_http)) -> Response:
     await session.set_mcp_tool_approval(server_label, data.tool_name, data.approval)
     return Response(status_code=204)
 
