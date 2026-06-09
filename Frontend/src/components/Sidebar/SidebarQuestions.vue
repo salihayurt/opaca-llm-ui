@@ -44,6 +44,7 @@
             <!-- body -->
             <div :id="'questions-' + index"
                  class="accordion-collapse collapse"
+                 :class="conf.selectedCategory === section.header ? 'show' : ''"
                  data-bs-parent="#sidebar-questions">
                 <div class="accordion-body">
 
@@ -142,7 +143,7 @@ export default {
     setup() {
         const {isMobile} = useDevice();
         const bsCollapseEvent = 'show.bs.collapse';
-        return { Localizer, isMobile, bsCollapseEvent };
+        return { conf, Localizer, isMobile, bsCollapseEvent };
     },
     methods: {
         async autogenerateSampleQuestions(numQuestions = 5) {
@@ -402,9 +403,6 @@ export default {
 
     async mounted() {
         Localizer.samplePrompts = await backendClient.getPrompts();
-
-        // open default category
-        this.expandSectionByHeader(conf.selectedCategory);
     }
 }
 </script>
