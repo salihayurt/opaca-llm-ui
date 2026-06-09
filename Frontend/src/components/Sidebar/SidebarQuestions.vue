@@ -253,16 +253,6 @@ export default {
             }
         },
 
-        toggleSectionByHeader(header, show = null) {
-            const index = Localizer.getPrompts()
-                .findIndex(section => section.header === header);
-            this.toggleSection(index, show);
-        },
-
-        expandSectionByHeader(header) {
-            this.toggleSectionByHeader(header, true);
-        },
-
         toggleSectionById(id, show = null) {
             const index = Localizer.getPrompts()
                 .findIndex(section => section.id === id);
