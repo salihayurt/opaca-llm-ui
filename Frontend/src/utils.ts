@@ -15,6 +15,7 @@ import type {
     SessionPrompts,
     PushMessage,
     DebugMessage,
+    RestrictedActions,
 } from "./models";
 
 class BackendClient {
@@ -40,6 +41,10 @@ class BackendClient {
 
     async getInternalTools(): Promise<Container[]> {
         return await this.sendRequest("GET", "internal-tools");
+    }
+
+    async getRestrictedActions(): Promise<RestrictedActions> {
+        return await this.sendRequest("GET", "admin/restrict");
     }
 
     async deployContainer(postContainer: PostContainerRequest, update: boolean = false): Promise<PostContainerResponse> {
@@ -182,6 +187,15 @@ class BackendClient {
 
     async resetPrompts(): Promise<void> {
         return await this.sendRequest("DELETE", "prompts");
+    }
+
+    async getContainerApprovals(containerId) {
+        return await this.sendRequest("GET", `containers/${containerId}/approval`);
+    }
+
+    async setContainerApproval(containerId, toolName, approval) {
+        const body = {tool_name: toolName, approval: approval};
+        return await this.sendRequest("PATCH", `containers/${containerId}/approval`, body);
     }
 
     // mcp
