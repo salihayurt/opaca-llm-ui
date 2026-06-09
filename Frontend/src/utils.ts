@@ -130,15 +130,15 @@ class BackendClient {
         return await this.sendRequest("DELETE", `files/${fileId}?ignore_error=${ignoreError}`);
     }
 
-    async suspendFile(fileId: string, suspend: boolean): Promise<void> {
-        await this.sendRequest("PATCH", `files/${fileId}?suspend=${suspend}`);
+    async setFilesActive(chatId: string, activeFiles: any): Promise<void> {
+        await this.sendRequest("PUT", `chats/${chatId}`, activeFiles);
     }
 
     async renameFile(fileId: string, name: string): Promise<void> {
         await this.sendRequest("PATCH", `files/${fileId}?name=${name}`);
     }
 
-    async uploadFiles(files: File[]): Promise<{ uploadedFiles: OpacaFile[] }> {
+    async uploadFiles(files: File[], chatId: string | null = null): Promise<{ uploadedFiles: OpacaFile[] }> {
         const formData = new FormData();
         for (const file of files) {
             formData.append("files", file);
@@ -147,6 +147,9 @@ class BackendClient {
         const response = await axios.post(`${conf.backendUrl}/files`, formData, {
             timeout: 10000,
             withCredentials: true,
+            params: {
+                chat_id: chatId,
+            },
             headers: {
                 'Content-Type': 'multipart/form-data',
                 'Access-Control-Allow-Origin': '*'

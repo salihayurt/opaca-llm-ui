@@ -14,10 +14,13 @@
             <SidebarFileItem
                 :file-id="file.file_id"
                 :file="file"
+                :selectedChatId="this.selectedChatId"
+                :chats="this.chats"
                 @delete-file="fileId => this.$emit('delete-file', fileId)"
-                @suspend-file="(fileId, suspend) => this.$emit('suspend-file', fileId, suspend)"
                 @view-file="$emit('view-file', $event)"
                 @rename-file="(fileId, newName) => this.$emit('rename-file', fileId, newName)"
+                @update-chats="() => this.$emit('update-chats')"
+                @update-files="() => this.updateFiles()"
             />
         </div>
     </div>
@@ -32,15 +35,19 @@ import SidebarFileItem from "./SidebarFileItem.vue";
 export default {
     name: 'SidebarFiles',
     components: {SidebarFileItem},
+    props: {
+        selectedChatId: String,
+        chats: Array,
+    },
     setup() {
         const {isMobile} = useDevice();
         return {Localizer, isMobile};
     },
     emits: [
         'delete-file',
-        'suspend-file',
         'view-file',
         'rename-file',
+        'update-chats',
     ],
     data() {
         return {
