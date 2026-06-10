@@ -117,7 +117,7 @@ class OpacaClient(AsyncOpacaClient):
         Invoke the given OPACA agent at the given agent (or any agent) with
         the given parameters. Considers blacklisted agents and actions.
         """
-        blacklist = map(str.lower, actions_blacklist)
+        blacklist = [a.lower() for a in actions_blacklist]
         if any(x in action.lower() for x in blacklist):
             raise Exception(f"Disallowed action: {action}")
         if agent is not None and any(x in agent.lower() for x in blacklist):
