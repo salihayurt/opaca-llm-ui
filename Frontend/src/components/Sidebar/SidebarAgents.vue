@@ -37,7 +37,7 @@
                             :aria-controls="`container-accordion-body-${containerId}`"
                             aria-expanded="false">
                         <i :class="isInternalContainer(containerId) ? 'fa fa-cube me-3' : 'fa fa-box me-3'"/>
-                        <strong>{{ image?.imageName ?? containerId }}</strong>
+                        <strong class="container-name">{{ image?.imageName ?? containerId }}</strong>
 
                         <i v-if="conf.allowContainerManagement && !isInternalContainer(containerId)"
                             class="fa fa-remove delete-icon"
@@ -115,7 +115,7 @@
                                             <p v-if="action.description">
                                                 <strong>{{ Localizer.get('agents_description') }}:</strong>
                                                 {{ action.description }}
-                                            </p>                                            
+                                            </p>
                                             <!-- Action Permissions -->
                                             <div class="d-flex align-items-baseline mb-3">
                                                 <strong class="me-2">Approval:</strong>
@@ -229,7 +229,7 @@ export default {
                     : [];
                 const internalContainers = await backendClient.getInternalTools();
                 const allContainers = [...externalContainers, ...internalContainers];
-                
+
                 // Fetch approvals for each container
                 for (let container of allContainers) {
                     try {
@@ -239,7 +239,7 @@ export default {
                         container.approvals = {};
                     }
                 }
-                
+
                 this.platformContainers = allContainers;
             } finally {
                 this.isLoading = false;
@@ -533,6 +533,10 @@ export default {
     padding: 1rem 1rem;
 }
 
+.accordion-button.containers-header .container-name {
+    flex: 1 1 auto;
+}
+
 .accordion-button.agents-header {
     padding: 0.9rem 1rem;
 }
@@ -564,7 +568,7 @@ export default {
 }
 
 .delete-icon {
-    position: absolute;
+    flex: 0 0 auto;
     width: 2em;
     height: 2em;
     right: 2rem;
@@ -572,7 +576,6 @@ export default {
     display: flex;
     align-items: center;
     justify-content: center;
-    transform: translateY(-50%);
     border-radius: var(--bs-border-radius-lg);
     cursor: pointer;
     transition: color 0.2s ease;
