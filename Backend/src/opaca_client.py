@@ -27,7 +27,7 @@ class OpacaClient(AsyncOpacaClient):
         self.connected = False
         self.login_lock = asyncio.Lock()
 
-    async def connect(self, url: str, user: str, pwd: str):
+    async def connect(self, url: str, user: str | None, pwd: str | None):
         """Connect with OPACA platform, get access token if necessary and try to fetch actions.
         Returns the original HTTP Status code returned by the OPACA Platform as the result body.
         """
@@ -35,8 +35,9 @@ class OpacaClient(AsyncOpacaClient):
         self.connected = False
         self.token = None
         try:
-            await self.platform_login(username=user, password=pwd)
-            await self.get_containers()
+            if user and pwd:
+                await self.platform_login(username=user, password=pwd)
+            await self.get_info()
             self.connected = True
             logger.info(f"Connected to {url}")
             return 200

@@ -164,7 +164,7 @@ async def set_blacklist(restrictions: RestrictedActions, auth = Depends(require_
 
 
 @app.post("/connect", description="Connect to OPACA Runtime Platform. Returns the status code of the original request (to differentiate from errors resulting from this call itself).", tags=["opaca"])
-async def connect(connect: ConnectRequest, session: SessionData = Depends(handle_session_http)) -> int:
+async def platform_connect(connect: ConnectRequest, session: SessionData = Depends(handle_session_http)) -> int:
     return await session.opaca_client.connect(connect.url, connect.user, connect.pwd)
 
 
