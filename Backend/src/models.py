@@ -94,20 +94,26 @@ class RestrictedActions(BaseModel):
     need_confirmation: List[str]
 
 
+class ToolApprovalState(Enum):
+    ASK = "ask"
+    DENY = "deny"
+    ALLOW = "allow"
+
+
 class MCPCreateRequest(BaseModel):
     """
     Used as payload for creating a new MCP server connection.
 
     Attributes:
-        content: the full MCP server configuration, including server_url, server_label, default_approval
+        type: the type of the MCP server, usually "mcp"
+        server_url: the URL of the MCP server to connect to
+        server_label: a human-readable label for the MCP server; if not given, it will be derived from the URL
+        default_approval: the default approval state for tools from this MCP server (ask/allow/deny)
     """
-    content: Dict[str, Any]
-
-
-class ToolApprovalState(Enum):
-    ASK = "ask"
-    DENY = "deny"
-    ALLOW = "allow"
+    type: str
+    server_url: str
+    server_label: str | None = None
+    default_approval: ToolApprovalState
 
 
 class ToolApprovalUpdateRequest(BaseModel):
@@ -518,57 +524,53 @@ class SessionData(BaseModel):
         self.opaca_approvals[container_id][tool_name] = approval
 
 
-    async def add_mcp_server(self, params: Dict[str, Any]) -> bool:
+    async def add_mcp_server(self, req: MCPCreateRequest) -> bool:
         """Adds a new mcp server json"""
 
-        # Check if the server_url field is existing
-        if "server_url" not in params:
-            raise OpacaException("The 'server_url' field is required.", "No 'server_url' provided!", 400)
-
         # Check if the server url is in a valid format:
-        if not re.match(r'^https?://', params["server_url"]):
+        if not re.match(r'^https?://', req.server_url):
             raise OpacaException("The 'server_url' needs to be in a valid url-format (e.g. 'http://<address>.com/mcp')", "Malformed 'server_url'!", 400)
 
         # Check if a previous mcp server with the same url already exists
-        if any(m.params.server_url == params["server_url"] for m in self.mcp_servers.values()):
-            raise OpacaException(f"An MCP server with the given server_url '{params['server_url']}' already exists!", "Duplicate 'server_url'!", 400)
+        if any(m.params.server_url == req.server_url for m in self.mcp_servers.values()):
+            raise OpacaException(f"An MCP server with the given server_url '{req.server_url}' already exists!", "Duplicate 'server_url'!", 400)
 
         # If no server label was given, transform the server_url into the label
-        if not params.get("server_label"):
-            params["server_label"] = re.sub(r'^.*//([^/]+).*$', r'\1', params["server_url"]).replace('.', '-')
-            
-        label = params["server_label"]
+        if not req.server_label:
+            req.server_label = re.sub(r'^.*//([^/]+).*$', r'\1', req.server_url).replace('.', '-')
 
         # Check if a previous mcp server with the same label already exists (UI saves mcp servers based on label)
-        if label in self.mcp_servers:
-            raise OpacaException(f"An MCP server with the given server_label '{label}' already exists!", "Duplicate 'server_label'!", 400)
+        if req.server_label in self.mcp_servers:
+            raise OpacaException(f"An MCP server with the given server_label '{req.server_label}' already exists!", "Duplicate 'server_label'!", 400)
 
         # Check if the given server-url is actually an mcp server
-        client = MCPClient(server_url=params["server_url"])
+        client = MCPClient(server_url=req.server_url)
         client_tools = await client.list_tools()
         if not client_tools:
-            raise OpacaException(f"The given server_url '{params['server_url']}' provides no mcp tools and cannot be added!", "Unreachable MCP server!", 400)
+            raise OpacaException(f"The given server_url '{req.server_url}' provides no mcp tools and cannot be added!", "Unreachable MCP server!", 400)
 
-        # Disable auto-execution of MCP tools by LiteLLM: Force it to always require approval
-        # Our backend manages the permission flow itself with UI integration
-        params["require_approval"] = "always"
-
-        # Extract and remove default_approval from the mcp_server dict (prevent litellm unknown parameter exception)
-        default_approval = params.pop("default_approval", ToolApprovalState.ASK)
+        mcp_params = MCPServerParams(
+            server_url=req.server_url,
+            server_label=req.server_label,
+            type=req.type,
+            # Disable auto-execution of MCP tools by LiteLLM: Force it to always require approval
+            # Our backend manages the permission flow itself with UI integration
+            require_approval="always"
+        )
 
         mcp_tools = {}
         for tool in client_tools:
-            full_name = f"{label}--{tool.name}"
+            full_name = f"{req.server_label}--{tool.name}"
             mcp_tools[full_name] = MCPTool(
                 name=tool.name,
                 description=tool.description if tool.description else '',
                 inputSchema=tool.inputSchema,
-                server_label=label,
-                approval=default_approval
+                server_label=req.server_label,
+                approval=req.default_approval
             )
 
-        self.mcp_servers[label] = MCPServer(
-            params=MCPServerParams.model_validate(params),
+        self.mcp_servers[req.server_label] = MCPServer(
+            params=mcp_params,
             tools=mcp_tools
         )
         return True

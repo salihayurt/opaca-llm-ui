@@ -157,9 +157,9 @@ export default {
                     mcpServerUrl: {type: "text", label: "Server URL"},
                     mcpServerLabel: {type: "text", label: "Server Label (Optional)", optional: true},
                     mcpDefaultApproval: {type: "select", label: "Default Approval", default: "ask", values: {
-                        ask: "Always ask",
-                        allow: "Auto allow",
-                        deny: "Auto deny"
+                        ask: "Always Ask",
+                        allow: "Auto Allow",
+                        deny: "Auto Deny"
                     }},
                 },
                 async (values) => {
@@ -174,7 +174,7 @@ export default {
 
                     // Add MCP server to backend, retry on failure
                     try {
-                        await backendClient.addMcp({"content": data});
+                        await backendClient.addMcp(data);
                     } catch (err) {
                         throw new Error(err.response.data.detail);
                     }

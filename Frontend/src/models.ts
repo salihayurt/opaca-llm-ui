@@ -36,6 +36,13 @@ export interface QueryRequest {
     streaming?: boolean;
 }
 
+export interface MCPCreateRequest {
+    type: string;
+    server_url: string;
+    server_label?: string;
+    default_approval: ToolApprovalState;
+}
+
 export interface ToolCall {
     id: string;
     type: "opaca" | "mcp" | string;
@@ -140,6 +147,20 @@ export interface ConfigPayload {
     config_schema: Record<string, any>;
 }
 
+export enum ToolApprovalState {
+    ASK = "ask",
+    DENY = "deny",
+    ALLOW = "allow"
+}
+
+export interface MCPTool {
+    name: string;
+    description: string;
+    inputSchema: Record<string, any>;
+    server_label: string;
+    approval: ToolApprovalState;
+}
+
 // --- Container Models ---
 export interface Container {
     containerId: string;
@@ -149,6 +170,7 @@ export interface Container {
     owner: string;
     runningSince: string;
     connectivity: ContainerConnectivity | null;
+    approvals?: Record<string, ToolApprovalState>; // UI internal field, not returned by backend
 }
 
 export interface ContainerImage {

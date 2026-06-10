@@ -271,7 +271,7 @@ async def get_mcp_list(session: SessionData = Depends(handle_session_http)) -> D
 
 @app.post("/mcp", description="Add a new MCP server to the list of available MCP servers", tags=["mcp"])
 async def add_mcp_server(mcp: MCPCreateRequest, session: SessionData = Depends(handle_session_http)) -> Response:
-    await session.add_mcp_server(mcp.content)
+    await session.add_mcp_server(mcp)
     return Response(status_code=201)
 
 

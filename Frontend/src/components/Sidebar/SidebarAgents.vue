@@ -232,12 +232,7 @@ export default {
 
                 // Fetch approvals for each container
                 for (let container of allContainers) {
-                    try {
-                        const appRes = await backendClient.getContainerApprovals(container.containerId);
-                        container.approvals = appRes || {};
-                    } catch (err) {
-                        container.approvals = {};
-                    }
+                    container.approvals = await backendClient.getContainerApprovals(container.containerId);
                 }
 
                 this.platformContainers = allContainers;
