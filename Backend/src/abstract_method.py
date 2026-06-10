@@ -161,7 +161,7 @@ class AbstractMethod(ABC):
             kwargs['tool_choice'] = 'auto'
 
         # Main stream logic
-        stream = await litellm.aresponses_api_with_mcp(**kwargs)
+        stream = await litellm.aresponses(**kwargs)
         async for event in stream:
 
             # Abort the response generation for a specific chat,
