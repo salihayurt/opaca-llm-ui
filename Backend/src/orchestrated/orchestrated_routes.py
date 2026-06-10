@@ -276,6 +276,9 @@ Now, using the tools available to you and the previous results, continue with yo
         - finally, ask OutputGenerator to create a response
         """
 
+        # the original user query (may be modified/extended in further iterations)
+        message = self.response.query
+
         # Track overall execution time
         overall_start_time = time.time()
 

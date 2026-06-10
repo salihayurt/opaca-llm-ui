@@ -37,7 +37,7 @@
                             :aria-controls="`container-accordion-body-${containerId}`"
                             aria-expanded="false">
                         <i :class="isInternalContainer(containerId) ? 'fa fa-cube me-3' : 'fa fa-box me-3'"/>
-                        <strong>{{ image?.imageName ?? containerId }}</strong>
+                        <strong class="container-name">{{ image?.imageName ?? containerId }}</strong>
 
                         <i v-if="conf.allowContainerManagement && !isInternalContainer(containerId)"
                             class="fa fa-remove delete-icon"
@@ -91,12 +91,11 @@
                                                 <div class="position-relative d-inline-block me-3">
                                                     <i class="fa fa-wrench"/>
                                                     <span class="position-absolute top-100 start-100 p-1 rounded-circle"
-                                                        :class="{
-                                                            'bg-approval-ask': (approvals?.[`${agentId}--${action.name}`] || 'allow') === 'ask',
-                                                            'bg-approval-deny': (approvals?.[`${agentId}--${action.name}`] || 'allow') === 'deny',
-                                                            'bg-approval-allow': (approvals?.[`${agentId}--${action.name}`] || 'allow') === 'allow'
-                                                        }" 
-                                                        style="outline: 2px solid var(--surface-color); transform: translate(-180%, -70%);">
+                                                          :class="{
+                                                              'bg-warning': getEffectiveApproval(agentId, action, approvals) === 'ask',
+                                                              'bg-danger': getEffectiveApproval(agentId, action, approvals) === 'deny',
+                                                              'bg-success': getEffectiveApproval(agentId, action, approvals) === 'allow'
+                                                          }" style="outline: 2px solid var(--surface-color); transform: translate(-180%, -70%);">
                                                         <span class="visually-hidden">Approval State</span>
                                                     </span>
                                                 </div>
@@ -116,24 +115,27 @@
                                             <p v-if="action.description">
                                                 <strong>{{ Localizer.get('agents_description') }}:</strong>
                                                 {{ action.description }}
-                                            </p>                                            
+                                            </p>
                                             <!-- Action Permissions -->
                                             <div class="d-flex align-items-baseline mb-3">
                                                 <strong class="me-2">Approval:</strong>
                                                 <div class="btn-group btn-group-sm w-100" role="group">
                                                     <input type="radio" class="btn-check" :name="`approval-${containerId}-${agentIndex}-${actionIndex}`" :id="`btn-ask-${containerId}-${agentIndex}-${actionIndex}`" autocomplete="off"
                                                         @change="e => setApproval(containerId, agentId, action.name, 'ask')"
-                                                        :checked="(approvals?.[`${agentId}--${action.name}`] || 'allow') === 'ask'">
+                                                        :checked="getEffectiveApproval(agentId, action, approvals) === 'ask'"
+                                                        :disabled="isForbiddenApplied(agentId, action)">
                                                     <label class="btn btn-outline-secondary approval-ask" :for="`btn-ask-${containerId}-${agentIndex}-${actionIndex}`">Ask</label>
 
                                                     <input type="radio" class="btn-check" :name="`approval-${containerId}-${agentIndex}-${actionIndex}`" :id="`btn-deny-${containerId}-${agentIndex}-${actionIndex}`" autocomplete="off"
                                                         @change="e => setApproval(containerId, agentId, action.name, 'deny')"
-                                                        :checked="(approvals?.[`${agentId}--${action.name}`] || 'allow') === 'deny'">
+                                                        :checked="getEffectiveApproval(agentId, action, approvals) === 'deny'"
+                                                        :disabled="isForbiddenApplied(agentId, action)">
                                                     <label class="btn btn-outline-secondary approval-deny" :for="`btn-deny-${containerId}-${agentIndex}-${actionIndex}`">Deny</label>
 
                                                     <input type="radio" class="btn-check" :name="`approval-${containerId}-${agentIndex}-${actionIndex}`" :id="`btn-allow-${containerId}-${agentIndex}-${actionIndex}`" autocomplete="off"
                                                         @change="e => setApproval(containerId, agentId, action.name, 'allow')"
-                                                        :checked="(approvals?.[`${agentId}--${action.name}`] || 'allow') === 'allow'">
+                                                        :checked="getEffectiveApproval(agentId, action, approvals) === 'allow'"
+                                                        :disabled="isForbiddenApplied(agentId, action) || isConfirmationApplied(agentId, action)">
                                                     <label class="btn btn-outline-secondary approval-allow" :for="`btn-allow-${containerId}-${agentIndex}-${actionIndex}`">Allow</label>
                                                 </div>
                                             </div>
@@ -172,6 +174,7 @@ import Localizer from "../../Localizer.js";
 import { useDevice } from "../../useIsMobile.js";
 import backendClient from "../../utils.js";
 import InputDialogue from '../InputDialogue.vue';
+import { getEffectiveApproval, isConfirmationTool, isForbiddenTool } from '../../approvalUtils.js';
 
 export default {
     name: 'SidebarAgents',
@@ -188,21 +191,30 @@ export default {
             platformContainers: null,
             isLoading: false,
             searchQuery: '',
+            restrictedActions: { forbidden: [], need_confirmation: [] },
         };
     },
     methods: {
+        getEffectiveApproval(agentId, action, approvals) {
+            return getEffectiveApproval(`${agentId}--${action.name}`, approvals?.[`${agentId}--${action.name}`], this.restrictedActions);
+        },
+        isForbiddenApplied(agentId, action) {
+            return isForbiddenTool(`${agentId}--${action.name}`, this.restrictedActions);
+        },
+        isConfirmationApplied(agentId, action) {
+            return isConfirmationTool(`${agentId}--${action.name}`, this.restrictedActions);
+        },
         async setApproval(containerId, agentName, actionName, approval) {
             const toolName = `${agentName}--${actionName}`;
-            
-            // Optimistically update the UI locally
-            const container = this.platformContainers.find(c => c.containerId === containerId);
-            if (container) {
-                if (!container.approvals) container.approvals = {};
-                container.approvals[toolName] = approval;
-            }
 
             try {
                 await backendClient.setContainerApproval(containerId, toolName, approval);
+
+                const container = this.platformContainers.find(c => c.containerId === containerId);
+                if (container) {
+                    if (!container.approvals) container.approvals = {};
+                    container.approvals[toolName] = approval;
+                }
             } catch (err) {
                 console.error("Failed to update approval", err);
             }
@@ -211,12 +223,13 @@ export default {
         async updatePlatformInfo() {
             this.isLoading = true;
             try {
+                this.restrictedActions = await backendClient.getRestrictedActions();
                 const externalContainers = this.isPlatformConnected
                     ? await backendClient.getContainers()
                     : [];
                 const internalContainers = await backendClient.getInternalTools();
                 const allContainers = [...externalContainers, ...internalContainers];
-                
+
                 // Fetch approvals for each container
                 for (let container of allContainers) {
                     try {
@@ -226,7 +239,7 @@ export default {
                         container.approvals = {};
                     }
                 }
-                
+
                 this.platformContainers = allContainers;
             } finally {
                 this.isLoading = false;
@@ -520,6 +533,10 @@ export default {
     padding: 1rem 1rem;
 }
 
+.accordion-button.containers-header .container-name {
+    flex: 1 1 auto;
+}
+
 .accordion-button.agents-header {
     padding: 0.9rem 1rem;
 }
@@ -551,7 +568,7 @@ export default {
 }
 
 .delete-icon {
-    position: absolute;
+    flex: 0 0 auto;
     width: 2em;
     height: 2em;
     right: 2rem;
@@ -559,7 +576,6 @@ export default {
     display: flex;
     align-items: center;
     justify-content: center;
-    transform: translateY(-50%);
     border-radius: var(--bs-border-radius-lg);
     cursor: pointer;
     transition: color 0.2s ease;

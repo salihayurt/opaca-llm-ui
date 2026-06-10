@@ -1,6 +1,7 @@
 """
 Request and response models used in the FastAPI routes (and in some of the implementations).
 """
+from enum import Enum
 import re
 from typing import Callable, Iterable, Set, Literal, Annotated
 from typing import List, Dict, Any, Iterator
@@ -93,6 +94,34 @@ class RestrictedActions(BaseModel):
     need_confirmation: List[str]
 
 
+class MCPCreateRequest(BaseModel):
+    """
+    Used as payload for creating a new MCP server connection.
+
+    Attributes:
+        content: the full MCP server configuration, including server_url, server_label, default_approval
+    """
+    content: Dict[str, Any]
+
+
+class ToolApprovalState(Enum):
+    ASK = "ask"
+    DENY = "deny"
+    ALLOW = "allow"
+
+
+class ToolApprovalUpdateRequest(BaseModel):
+    """Used as payload for updating the approval status of a tool.
+    
+    Attributes:
+        tool_name: the full name of the tool for which the approval status should be updated
+        approval: the new approval status
+
+    """
+    tool_name: str
+    approval: ToolApprovalState
+
+
 class QueryRequest(BaseModel):
     """
     Used as the expected body argument in the `/query/{method}` endpoints
@@ -169,13 +198,11 @@ class OpacaFile(BaseModel):
         content_type: MIME type of the file
         file_name: The absolute path to the file
         host_ids: IDs assigned by each host the file has been uploaded to
-        suspended: Whether the file should be excluded from future requests
     """
     file_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     content_type: str
     file_name: str
     host_ids: Dict[str, str] = Field(default_factory=dict)
-    suspended: bool = False
 
 
 class ChatMessage(BaseModel):
@@ -213,9 +240,6 @@ class InternalTool(BaseModel):
     result: str
     function: Callable
     requires_code_execution: bool = False
-
-
-ToolApprovalType = Literal["ask", "deny", "allow"]
 
 
 class ScheduledTask(BaseModel):
@@ -268,6 +292,7 @@ class Chat(BaseModel):
         time_modified: when the chat was last used
         is_aborted: Boolean indicating whether the current interaction should be aborted.
         is_finished: Boolean indicating whether the chat has finished generating a response for its last query.
+        active_files: Set of active file IDs.
         messages: Chat history (user queries and final LLM responses), used in subsequent requests. (derived)
     """
     chat_id: str
@@ -277,6 +302,7 @@ class Chat(BaseModel):
     time_modified: datetime = Field(default_factory=lambda: datetime.now(tz=timezone.utc))
     is_aborted: bool = False
     is_finished: bool = True
+    active_files: Set[str] = set()
 
     @property
     def messages(self) -> Iterator[ChatMessage]:
@@ -307,7 +333,7 @@ class MCPTool(BaseModel):
     description: str
     inputSchema: Dict[str, Any]
     server_label: str
-    approval: ToolApprovalType
+    approval: ToolApprovalState
 
     def get_full_name(self) -> str:
         """Get the full tool name as expected by the LLM, including the server label."""
@@ -374,7 +400,7 @@ class SessionData(BaseModel):
     notifications_chats_map: Dict[int, Set[str]] = Field(default_factory=dict)
     valid_until: float = -1
     mcp_servers: Dict[str, MCPServer] = Field(default_factory=dict)
-    opaca_approvals: Dict[str, Dict[str, ToolApprovalType]] = Field(default_factory=dict)
+    opaca_approvals: Dict[str, Dict[str, ToolApprovalState]] = Field(default_factory=dict)
     blocked: bool = False
     prompts: SessionPrompts | None = None
     is_notifs_aborted: bool = False
@@ -466,7 +492,7 @@ class SessionData(BaseModel):
             tools[server.params.server_label] = list(server.tools.values())
         return tools
 
-    async def set_mcp_tool_approval(self, server_label: str, tool_name: str, approval: ToolApprovalType):
+    async def set_mcp_tool_approval(self, server_label: str, tool_name: str, approval: ToolApprovalState):
         """Set whether a tool call should be allowed, denied, or require confirmation by the user."""
         server = self.mcp_servers.get(server_label)
         if not server:
@@ -479,13 +505,14 @@ class SessionData(BaseModel):
         
         tool.approval = approval
 
-    def get_tool_approval(self, tool_name: str) -> ToolApprovalType:
+    def get_opaca_tool_approval(self, tool_name: str) -> ToolApprovalState:
+        """Returns the approval state for a given OPACA/internal tool the user has set. It does not check the admin blacklist."""
         for container_approvals in self.opaca_approvals.values():
             if tool_name in container_approvals:
                 return container_approvals[tool_name]
-        return "allow"
+        return ToolApprovalState.ALLOW
 
-    def set_tool_approval(self, container_id: str, tool_name: str, approval: ToolApprovalType):
+    def set_opaca_tool_approval(self, container_id: str, tool_name: str, approval: ToolApprovalState):
         if container_id not in self.opaca_approvals:
             self.opaca_approvals[container_id] = {}
         self.opaca_approvals[container_id][tool_name] = approval
@@ -527,7 +554,7 @@ class SessionData(BaseModel):
         params["require_approval"] = "always"
 
         # Extract and remove default_approval from the mcp_server dict (prevent litellm unknown parameter exception)
-        default_approval = params.pop("default_approval", "ask")
+        default_approval = params.pop("default_approval", ToolApprovalState.ASK)
 
         mcp_tools = {}
         for tool in client_tools:
@@ -619,17 +646,6 @@ class OpacaException(Exception):
         self.user_message = user_message
         self.error_message = error_message
         self.status_code = status_code
-
-
-# MCP MESSAGES
-
-class MCPCreateMessage(BaseModel):
-    content: Dict[str, Any]
-
-
-class ToolApproval(BaseModel):
-    tool_name: str
-    approval: ToolApprovalType
 
 
 # MESSAGES SENT OR RECEIVED VIA WEBSOCKET

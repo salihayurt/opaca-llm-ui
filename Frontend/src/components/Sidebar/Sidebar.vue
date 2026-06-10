@@ -93,22 +93,26 @@
                     v-show="SidebarManager.isViewSelected('chats')"
                     :selected-chat-id="this.selectedChatId"
                     :is-finished="this.isFinished"
+                    :chats="this.chats"
                     @select-chat="chatId => this.$emit('select-chat', chatId)"
                     @delete-chat="chatId => this.$emit('delete-chat', chatId)"
                     @rename-chat="(chatId, newName) => this.$emit('rename-chat', chatId, newName)"
                     @new-chat="() => this.$emit('new-chat')"
                     @goto-search-result="(chatId, messageId) => this.$emit('goto-search-result', chatId, messageId)"
                     @delete-all-chats="() => this.$emit('delete-all-chats')"
+                    @update-chats="this.updateChats"
                     ref="chats"
                 />
 
                 <!-- uploaded files -->
                 <SidebarFiles
+                    :selectedChatId="this.selectedChatId"
+                    :chats="this.chats"
                     v-show="SidebarManager.isViewSelected('files')"
                     @delete-file="fileId => this.$emit('delete-file', fileId)"
-                    @suspend-file="(fileId, suspend) => this.$emit('suspend-file', fileId, suspend)"
                     @view-file="$emit('view-file', $event)"
                     @rename-file="(fileId, newName) => this.$emit('rename-file', fileId, newName)"
+                    @update-chats="this.updateChats"
                     ref="files"
                 />
 
@@ -180,6 +184,7 @@ import SidebarFaq from "./SidebarFaq.vue";
 import SidebarChats from "./SidebarChats.vue";
 import SidebarFiles from "./SidebarFiles.vue";
 import SidebarMcp from "./SidebarMcp.vue";
+import backendClient from "../../utils.js";
 
 export default {
     name: 'Sidebar',
@@ -207,7 +212,6 @@ export default {
         'rename-chat',
         'new-chat',
         'delete-file',
-        'suspend-file',
         'view-file',
         'rename-file',
         'goto-search-result',
@@ -221,6 +225,7 @@ export default {
         return {
             sidebarCollapsed: conf.sidebarCollapsed,
             sidebarToggleHovered: false,
+            chats: [],
         };
     },
     methods: {
@@ -272,6 +277,14 @@ export default {
             });
         },
 
+        async updateChats() {
+            try {
+                this.chats = await backendClient.chats();
+            } catch (error) {
+                console.error(error);
+                this.chats = [];
+            }
+        },
     },
     mounted() {
         this.setupResizer();
