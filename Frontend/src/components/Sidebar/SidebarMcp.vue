@@ -50,9 +50,9 @@
                                     <i class="fa fa-wrench"/>
                                     <span class="position-absolute top-100 start-100 p-1 rounded-circle"
                                           :class="{
-                                              'bg-warning': getEffectiveApproval(mcp) === 'ask',
-                                              'bg-danger': getEffectiveApproval(mcp) === 'deny',
-                                              'bg-success': getEffectiveApproval(mcp) === 'allow'
+                                              'bg-approval-ask': getEffectiveApproval(mcp) === 'ask',
+                                              'bg-approval-deny': getEffectiveApproval(mcp) === 'deny',
+                                              'bg-approval-allow': getEffectiveApproval(mcp) === 'allow'
                                           }" style="outline: 2px solid var(--surface-color); transform: translate(-30%, -90%);">
                                         <span class="visually-hidden">Approval State</span>
                                     </span>

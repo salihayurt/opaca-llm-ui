@@ -92,9 +92,9 @@
                                                     <i class="fa fa-wrench"/>
                                                     <span class="position-absolute top-100 start-100 p-1 rounded-circle"
                                                           :class="{
-                                                              'bg-warning': getEffectiveApproval(agentId, action, approvals) === 'ask',
-                                                              'bg-danger': getEffectiveApproval(agentId, action, approvals) === 'deny',
-                                                              'bg-success': getEffectiveApproval(agentId, action, approvals) === 'allow'
+                                                              'bg-approval-ask': getEffectiveApproval(agentId, action, approvals) === 'ask',
+                                                              'bg-approval-deny': getEffectiveApproval(agentId, action, approvals) === 'deny',
+                                                              'bg-approval-allow': getEffectiveApproval(agentId, action, approvals) === 'allow'
                                                           }" style="outline: 2px solid var(--surface-color); transform: translate(-180%, -70%);">
                                                         <span class="visually-hidden">Approval State</span>
                                                     </span>
