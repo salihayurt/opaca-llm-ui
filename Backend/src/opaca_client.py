@@ -97,7 +97,7 @@ class OpacaClient(AsyncOpacaClient):
             for agent in container.agents
         }
 
-    async def get_actions_openapi(self, inline_refs=False):
+    async def get_actions_openapi(self, inline_refs=False) -> dict:
         """Get actions of OPACA agents in OpenAPI format; if inline_refs is true, datatypes will be
         inlined directly into the action JSON instead of being a separate block.
         """
@@ -110,7 +110,7 @@ class OpacaClient(AsyncOpacaClient):
             else:
                 return res.json()
         except Exception as e:
-            logger.error(f"Could not get Actions: {e}")
+            logger.error(f"Failed to get OpenAPI actions: {e}")
             raise e
 
     async def safe_invoke(self, action: str, agent: str | None, params: dict) -> Any | None:
