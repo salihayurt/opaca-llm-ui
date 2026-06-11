@@ -118,22 +118,26 @@
                     v-show="SidebarManager.isViewSelected('chats')"
                     :selected-chat-id="this.selectedChatId"
                     :is-finished="this.isFinished"
+                    :chats="this.chats"
                     @select-chat="chatId => this.$emit('select-chat', chatId)"
                     @delete-chat="chatId => this.$emit('delete-chat', chatId)"
                     @rename-chat="(chatId, newName) => this.$emit('rename-chat', chatId, newName)"
                     @new-chat="() => this.$emit('new-chat')"
                     @goto-search-result="(chatId, messageId) => this.$emit('goto-search-result', chatId, messageId)"
                     @delete-all-chats="() => this.$emit('delete-all-chats')"
+                    @update-chats="this.updateChats"
                     ref="chats"
                 />
 
                 <!-- uploaded files -->
                 <SidebarFiles
+                    :selectedChatId="this.selectedChatId"
+                    :chats="this.chats"
                     v-show="SidebarManager.isViewSelected('files')"
                     @delete-file="fileId => this.$emit('delete-file', fileId)"
-                    @suspend-file="(fileId, suspend) => this.$emit('suspend-file', fileId, suspend)"
                     @view-file="$emit('view-file', $event)"
                     @rename-file="(fileId, newName) => this.$emit('rename-file', fileId, newName)"
+                    @update-chats="this.updateChats"
                     ref="files"
                 />
 
@@ -141,7 +145,6 @@
                 <SidebarQuestions
                     v-show="SidebarManager.isViewSelected('questions')"
                     @select-question="question => this.$emit('select-question', question)"
-                    @select-category="category => this.$emit('select-category', category)"
                     ref="questions"
                 />
 
@@ -169,7 +172,6 @@
                 <!-- method config -->
                 <SidebarConfig
                     v-show="SidebarManager.isViewSelected('config')"
-                    :method="this.method"
                     ref="config"
                 />
 
@@ -196,7 +198,6 @@
 import conf from '../../../config.js'
 import { useDevice } from "../../useIsMobile.js";
 import SidebarManager from "../../SidebarManager.js";
-import Cookie from "js-cookie";
 import { useAuth0 } from "@auth0/auth0-vue";
 import Localizer from "../../Localizer.js";
 import SidebarQuestions from './SidebarQuestions.vue';
@@ -226,21 +227,17 @@ export default {
         SidebarQuestions,
     },
     props: {
-        method: String,
-        language: String,
         connected: Boolean,
         selectedChatId: String,
         isFinished: Boolean,
     },
     emits: [
         'select-question',
-        'select-category',
         'select-chat',
         'delete-chat',
         'rename-chat',
         'new-chat',
         'delete-file',
-        'suspend-file',
         'view-file',
         'rename-file',
         'goto-search-result',
@@ -253,8 +250,9 @@ export default {
     },
     data() {
         return {
-            sidebarCollapsed: true,
+            sidebarCollapsed: conf.sidebarCollapsed,
             sidebarToggleHovered: false,
+            chats: [],
             accountMenuOpen: false,
         };
     },
@@ -286,8 +284,8 @@ export default {
         },
 
         toggleSidebar() {
-            this.sidebarCollapsed = !this.sidebarCollapsed;
-            Cookie.set('sidebar_collapsed', this.sidebarCollapsed);
+            conf.sidebarCollapsed = !conf.sidebarCollapsed;
+            this.sidebarCollapsed = conf.sidebarCollapsed; // needed for auto-update
 
             // Close view if it is now hidden
             const view = this.SidebarManager.getSelectedView();
@@ -297,13 +295,13 @@ export default {
         },
 
         getSidebarToggleIcon() {
-            if (this.sidebarCollapsed) return 'fa-angle-down';
+            if (conf.sidebarCollapsed) return 'fa-angle-down';
             if (this.sidebarToggleHovered) return 'fa-angle-up';
             return 'fa-minus';
         },
 
         getSidebarToggleTooltip() {
-            if (this.sidebarCollapsed) return Localizer.get('sidebar_showAdvancedTools');
+            if (conf.sidebarCollapsed) return Localizer.get('sidebar_showAdvancedTools');
             return Localizer.get('sidebar_showStandardTools');
         },
 
@@ -333,18 +331,23 @@ export default {
             });
         },
 
+        async updateChats() {
+            try {
+                this.chats = await backendClient.chats();
+            } catch (error) {
+                console.error(error);
+                this.chats = [];
+            }
+        },
     },
     mounted() {
         this.setupResizer();
         document.addEventListener('click', this.closeProfileMenu);
 
-        this.sidebarCollapsed = Cookie.get('sidebar_collapsed') !== 'false';
-
         if (this.isMobile) {
             SidebarManager.close()
         } else {
-            const selectedView = Cookie.get('selected_view') ?? conf.DefaultSidebarView;
-            SidebarManager.selectView(selectedView, this.sidebarCollapsed);
+            SidebarManager.selectView(conf.selectedSidebar, conf.sidebarCollapsed);
         }
     },
     beforeUnmount() {

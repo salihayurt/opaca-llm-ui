@@ -54,9 +54,15 @@
   },
   "devDependencies": {
     "@iconify/vue": "^4.1.1",
+    "@types/dom-speech-recognition": "^0.0.10",
+    "@types/js-cookie": "^3.0.6",
+    "@types/node": "^25.6.0",
     "@vitejs/plugin-vue": "^6.0.0",
+    "@vue/tsconfig": "^0.9.1",
     "sass": "^1.69.0",
-    "typescript": "^5.2.2",
-    "vite": "^7.0.5"
+    "typescript": "^6.0.3",
+    "user-agent-data-types": "^0.4.3",
+    "vite": "^7.0.5",
+    "vue-tsc": "^3.2.8"
   }
 }

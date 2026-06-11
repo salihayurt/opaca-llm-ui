@@ -20,20 +20,16 @@
         />
 
         <Sidebar
-            :method="method"
-            :language="language"
             :connected="connected"
             :selected-chat-id="selectedChatId"
             :is-finished="this.isChatFinished()"
             ref="sidebar"
             @select-question="question => this.handleSelectQuestion(question)"
-            @select-category="category => this.handleSelectCategory(category)"
             @select-chat="chatId => this.handleSelectChat(chatId)"
             @delete-chat="chatId => this.handleDeleteChat(chatId)"
             @rename-chat="(chatId, newName) => this.handleRenameChat(chatId, newName)"
-            @new-chat="() => {this.suspendAllFiles(); this.startNewChat()}"
+            @new-chat="() => this.startNewChat()"
             @delete-file="fileId => this.handleDeleteFile(fileId)"
-            @suspend-file="(fileId, suspend) => this.handleSuspendFile(fileId, suspend)"
             @view-file="openViewer"
             @rename-file="handleRenameFile"
             @goto-search-result="(chatId, messageId) => this.gotoSearchResult(chatId, messageId)"
@@ -68,7 +64,7 @@
                     <div v-if="!this.isMobile" class="w-100 p-3 text-center fs-4">
                         {{ Localizer.get("chatarea_welcome") }}
                     </div>
-                    <div v-for="(question, index) in Localizer.getSampleQuestions(this.textInput, this.selectedCategory)"
+                    <div v-for="(question, index) in Localizer.getSampleQuestions(this.textInput, conf.selectedCategory)"
                          :key="index"
                          class="sample-question"
                          @click="this.askSampleQuestion(question.question)">
@@ -142,7 +138,6 @@
                                 type="file"
                                 ref="fileInput"
                                 class="d-none"
-                                :disabled="!this.isFinished"
                                 @change="handleFileSelection"
                                 multiple
                             />
@@ -202,7 +197,7 @@ import {nextTick} from "vue";
 import * as uuid from "uuid";
 import Sidebar from "./Sidebar/Sidebar.vue";
 import Chatbubble from "./chatbubble.vue";
-import conf from '../../config'
+import conf, {addListener} from '../../config.js'
 import backendClient, { formatAgentDebugText, formatToolDebugResult } from "../utils.js";
 import Localizer from "../Localizer.js";
 import AudioManager from "../AudioManager.js";
@@ -226,19 +221,16 @@ export default {
         FileDropHandler,
     },
     props: {
-        method: String,
-        language: String,
         connected: Boolean,
     },
     emits: [
-        'select-category',
         'container-login-required',
         'api-key-required',
         'new-notification',
     ],
     setup() {
         const { isMobile } = useDevice()
-        return { Localizer, AudioManager, isMobile };
+        return { conf, Localizer, AudioManager, isMobile };
     },
     data() {
         return {
@@ -246,7 +238,6 @@ export default {
             textInput: '',
             showExampleQuestions: true,
             autoSpeakNextMessage: false,
-            selectedCategory: conf.DefaultQuestions,
             isSmallScrollbar: true,
             selectedFiles: [],
             selectedChatId: '',
@@ -281,7 +272,7 @@ export default {
                 this.selectedFiles = [];
 
                 // update chats list
-                await this.$refs.sidebar.$refs.chats.updateChats();
+                await this.$refs.sidebar.updateChats();
             }
         },
 
@@ -354,7 +345,7 @@ export default {
 
             // get chat response (intermediate results are streamed via websocket)
             try {
-                const result = await backendClient.query(this.selectedChatId, this.method, userText, true, 5*60*1000);
+                const result = await backendClient.query(this.selectedChatId, conf.method, userText, true, 5*60*1000);
 
                 // display final result
                 if (result.error) {
@@ -368,7 +359,7 @@ export default {
                 aiBubble.toggleLoading(false);
                 this.startAutoSpeak();
                 this.scrollDownChat();
-                await this.$refs.sidebar.$refs.chats.updateChats();
+                await this.$refs.sidebar.updateChats();
             }
         },
 
@@ -447,18 +438,21 @@ export default {
             const wrappedFiles = files.map(file => ({
                 file,
                 fileId: null,
-                isUploading: true
+                isUploading: true,
             }));
             this.selectedFiles.push(...wrappedFiles);
 
             try {
-                const result = await backendClient.uploadFiles(files);
+                const result = await backendClient.uploadFiles(files, this.selectedChatId);
 
-                result.uploaded_files.forEach((uploaded, idx) => {
+                result.uploadedFiles?.forEach((uploaded, idx) => {
                     const wrapper = wrappedFiles[idx];
                     wrapper.fileId = uploaded.file_id;
                     wrapper.isUploading = false;
                 });
+
+                await this.$refs.sidebar.$refs.files.updateFiles();
+                await this.$refs.sidebar.updateChats();
             } catch (error) {
                 console.error("File upload failed:", error);
                 this.showInfo("File upload failed. See console for details.");
@@ -490,21 +484,6 @@ export default {
             }
         },
 
-        async handleSuspendFile(fileId, suspend) {
-            await backendClient.suspendFile(fileId, suspend);
-            await this.$refs.sidebar.$refs.files.updateFiles();
-        },
-
-        async suspendAllFiles() {
-            const files = await backendClient.files();
-            for (const file of Object.values(files)) {
-                if (!file.suspended) {
-                    await backendClient.suspendFile(file.file_id, true);
-                }
-            }
-            await this.$refs.sidebar.$refs.files.updateFiles();
-        },
-
         async handleRenameFile(fileId, newName) {
             await backendClient.renameFile(fileId, newName);
             await this.$refs.sidebar.$refs.files.updateFiles();
@@ -523,7 +502,7 @@ export default {
         },
 
         async connectWebsocket() {
-            const url = `${conf.BackendAddress}/ws`
+            const url = `${conf.backendUrl}/ws`
             this.socket = new WebSocket(url);
             this.socket.onmessage = event => this.handleStreamingSocketMessage(event);
         },
@@ -541,7 +520,7 @@ export default {
             }
 
             if (result.type === 'ReloadChatsMessage') {
-                await this.$refs.sidebar.$refs.chats.updateChats();
+                await this.$refs.sidebar.updateChats();
             }
 
             if (result.type === "ConfirmActionNotification") {
@@ -762,6 +741,7 @@ export default {
                     const isLoading = !chat.is_finished && index === numResponses - 1;
                     await this.addChatBubble(msg.content, false, isLoading);
                     await nextTick();
+                    const aiBubble = this.getLastBubble();
 
                     for (const agent_message of msg.agent_messages) {
                         const chunk = {
@@ -780,7 +760,6 @@ export default {
                             execution_time: agent_message.execution_time,
                             metrics: agent_message.response_metadata
                         };
-                        const aiBubble = this.getLastBubble();
                         aiBubble?.addMetric(metric)
                     }
                     if (msg.error) {
@@ -809,12 +788,8 @@ export default {
         },
 
         handleSelectCategory(category) {
-            if (this.selectedCategory !== category) {
-                if (this.showExampleQuestions) {
-                    Localizer.reloadSampleQuestions(category);
-                }
-                this.selectedCategory = category;
-                this.$emit('select-category', category);
+            if (this.showExampleQuestions) {
+                Localizer.reloadSampleQuestions(category);
             }
         },
 
@@ -826,21 +801,21 @@ export default {
         async handleDeleteChat(chatId) {
             await this.startNewChat();
             await backendClient.delete(chatId);
-            await this.$refs.sidebar.$refs.chats.updateChats(chatId);
+            await this.$refs.sidebar.updateChats();
         },
 
         async handleRenameChat(chatId, newName) {
             try {
                 await backendClient.updateName(chatId, newName);
             } finally {
-                await this.$refs.sidebar.$refs.chats.updateChats(chatId);
+                await this.$refs.sidebar.updateChats();
             }
         },
 
         async handleDeleteAllChats() {
             await this.startNewChat();
             await backendClient.deleteAllChats();
-            await this.$refs.sidebar.$refs.chats.updateChats();
+            await this.$refs.sidebar.updateChats();
         },
 
         async startNewChat() {
@@ -919,6 +894,7 @@ export default {
     mounted() {
         this.startNewChat();
         this.updateScrollbarThumb();
+        addListener("selectedCategory", (category) => this.handleSelectCategory(category));
     },
     watch: {
         textInput() {

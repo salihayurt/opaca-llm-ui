@@ -18,13 +18,14 @@ from litellm.types.responses.main import OutputFunctionToolCall
 from litellm.types.llms.openai import ResponsesAPIStreamEvents as event_type
 from mcp.types import CallToolRequestParams
 
-from .models import (SessionData, QueryResponse, AgentMessage, ChatMessage, OpacaException, Chat,
+from .models import (ToolApprovalState, SessionData, QueryResponse, AgentMessage, ChatMessage, OpacaException, Chat,
                      ToolCall, ContainerLoginNotification, ContainerLoginResponse, ToolCallMessage,
                      ToolResultMessage, TextChunkMessage, MetricsMessage, StatusMessage, MethodConfig,
                      MissingApiKeyNotification, MissingApiKeyResponse, ConfirmActionNotification, ConfirmActionResponse,
                      LLMConfig)
 from .file_utils import upload_files
 from .internal_tools import InternalTools, INTERNAL_TOOLS_AGENT_NAME
+from .opaca_client import actions_blacklist
 
 
 # list of string-fragments; if any action or agent name contains one of those, SAGE will ask for confirmation before calling the tool
@@ -65,6 +66,20 @@ class AbstractMethod(ABC):
 
     def next_tool_id(self, agent_message: AgentMessage):
         return f"{agent_message.id}/{next(self.tool_counter)}"
+
+    @staticmethod
+    def _resolve_tool_approval(tool_name: str, user_approval: ToolApprovalState) -> ToolApprovalState:
+        if any(x.lower() in tool_name.lower() for x in actions_blacklist):
+            # First the admin blacklist is applied
+            return ToolApprovalState.DENY
+        if user_approval == ToolApprovalState.DENY:
+            # Then the user's approval setting for the tool
+            return ToolApprovalState.DENY
+        if any(x.lower() in tool_name.lower() for x in actions_needing_confirmation):
+            # Then the admin confirmation list
+            return ToolApprovalState.ASK
+        # Then either the users ask or allow
+        return user_approval
 
     async def call_llm(
             self,
@@ -110,7 +125,7 @@ class AbstractMethod(ABC):
         exec_time = time.time()
         agent_message = AgentMessage(agent=agent, content='', tools=[])
 
-        file_message_parts = await upload_files(self.session, model)
+        file_message_parts = await upload_files(self.session, self.chat, model)
 
         # Modify the last user message to include file parts
         if file_message_parts:
@@ -255,8 +270,22 @@ class AbstractMethod(ABC):
         else:
             agent_name, action_name = None, tool_name
 
-        if not (login_attempt_retry or await self.check_confirmation(tool_name, tool_args)):
-            return ToolCall(id=tool_id, type="opaca", name=tool_name, args=tool_args, result="Execution declined by user, do not attempt again.")
+        # If login_attempt_retry=True, the user has already been asked and allowed tool execution
+        # before the container login was triggered, so we skip this part.
+        if not login_attempt_retry:
+            approval_state = self._resolve_tool_approval(
+                tool_name,
+                self.session.get_opaca_tool_approval(tool_name),
+            )
+
+            if approval_state == ToolApprovalState.DENY:
+                return ToolCall(id=tool_id, type="opaca", name=tool_name, args=tool_args, result="Execution denied by user settings, do not attempt again.")
+            if approval_state == ToolApprovalState.ASK:
+                if not await self.check_confirmation(tool_name, tool_args, force_ask=True):
+                    return ToolCall(id=tool_id, type="opaca", name=tool_name, args=tool_args, result="Execution declined by user, do not attempt again.")
+
+            if not (login_attempt_retry or await self.check_confirmation(tool_name, tool_args)):
+                return ToolCall(id=tool_id, type="opaca", name=tool_name, args=tool_args, result="Execution declined by user, do not attempt again.")
 
         try:
             if agent_name == INTERNAL_TOOLS_AGENT_NAME:
@@ -277,30 +306,27 @@ class AbstractMethod(ABC):
         return ToolCall(id=tool_id, type="opaca", name=tool_name, args=tool_args, result=t_result)
 
     async def invoke_mcp_tool(self, full_tool_name: str, tool_args: dict, tool_id: str) -> ToolCall:
+        async def create_result(result):
+            await self.send_to_websocket(ToolResultMessage(id=tool_id, result=result, chat_id=self.chat.chat_id))
+            return ToolCall(id=tool_id, type="mcp", name=full_tool_name, args=tool_args, result=result)
+
         server_label, tool_name = full_tool_name.split('--', maxsplit=1)
         server = self.session.mcp_servers.get(server_label)
         if not server:
-            t_result = f"MCP Server '{server_label}' not found."
-            await self.send_to_websocket(ToolResultMessage(id=tool_id, result=t_result))
-            return ToolCall(id=tool_id, type="mcp", name=full_tool_name, args=tool_args, result=t_result)
+            return await create_result(f"MCP Server '{server_label}' not found.")
         
         tool = server.tools.get(full_tool_name)
         if not tool:
-            t_result = f"Tool '{full_tool_name}' not found on MCP Server '{server_label}'."
-            await self.send_to_websocket(ToolResultMessage(id=tool_id, result=t_result))
-            return ToolCall(id=tool_id, type="mcp", name=full_tool_name, args=tool_args, result=t_result)
+            return await create_result(f"Tool '{full_tool_name}' not found on MCP Server '{server_label}'.")
 
-        if tool.approval == 'deny':
+        approval_state = self._resolve_tool_approval(full_tool_name, tool.approval)
+        if approval_state == ToolApprovalState.DENY:
             # Should not happen due to filtering in get_tools, but double-checking approval status just in case it changes in the future
-            t_result = "Execution denied by user settings, do not attempt again."
-            await self.send_to_websocket(ToolResultMessage(id=tool_id, result=t_result))
-            return ToolCall(id=tool_id, type="mcp", name=full_tool_name, args=tool_args, result=t_result)
+            return await create_result("Execution denied by user settings, do not attempt again.")
             
-        if tool.approval == 'ask':
+        if approval_state == ToolApprovalState.ASK:
             if not await self.check_confirmation(full_tool_name, tool_args, force_ask=True):
-                t_result = "Execution declined by user, do not attempt again."
-                await self.send_to_websocket(ToolResultMessage(id=tool_id, result=t_result))
-                return ToolCall(id=tool_id, type="mcp", name=full_tool_name, args=tool_args, result=t_result)
+                return await create_result("Execution declined by user, do not attempt again.")
 
         try:
             client = MCPClient(server_url=server.params.server_url)
@@ -313,9 +339,7 @@ class AbstractMethod(ABC):
         except Exception as e:
             t_result = f"Failed to invoke MCP tool.\nCause: {e}"
 
-        await self.send_to_websocket(ToolResultMessage(id=tool_id, result=t_result))
-        return ToolCall(id=tool_id, type="mcp", name=full_tool_name, args=tool_args, result=t_result)
-
+        return await create_result(t_result)
 
     async def get_tools(self, include_internal: bool = True, include_mcp: bool = True, max_tools=128) -> tuple[list[dict], str]:
         """
@@ -323,19 +347,30 @@ class AbstractMethod(ABC):
         """
         tools, error = openapi_to_functions(await self.session.opaca_client.get_actions_openapi(inline_refs=True))
 
-        if include_mcp and self.session.mcp_servers:
-            for server in self.session.mcp_servers.values():
-                for tool in server.tools.values():
-                    if tool.approval == 'deny':
-                        # Hide tools from LLM that are denied by user settings
-                        continue
-                    tools.append(tool.cast_to_openai_tool())
-
         if self.internal_tools and include_internal:
             tools.extend(self.internal_tools.get_internal_tools_openai())
+
+        # Filter out OPACA tools if user denied OR if it hits the admin blacklist
+        tools = [
+            t for t in tools 
+            if self.session.get_opaca_tool_approval(t["name"]) != ToolApprovalState.DENY
+            and not any(x.lower() in t["name"].lower() for x in actions_blacklist)
+        ]
+
+        # Gather, filter, and cast MCP tools (applying user settings and admin blacklist)
+        if include_mcp and self.session.mcp_servers:
+            mcp_tools = [
+                tool.cast_to_openai_tool()
+                for server in self.session.mcp_servers.values()
+                for tool in server.tools.values()
+                if tool.approval != ToolApprovalState.DENY
+                and not any(x.lower() in tool.name.lower() for x in actions_blacklist)
+            ]
+            tools.extend(mcp_tools)
+
         if len(tools) > max_tools:
             error += (f"WARNING: Your number of tools ({len(tools)}) exceeds the maximum tool limit "
-                      f"of {max_tools}. All tools after index {max_tools} will be ignored!\n")
+                    f"of {max_tools}. All tools after index {max_tools} will be ignored!\n")
             tools = tools[:max_tools]
         return tools, error
 
