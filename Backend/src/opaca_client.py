@@ -53,9 +53,10 @@ class OpacaClient(AsyncOpacaClient):
     async def disconnect(self) -> None:
         """Clears authentication and connection state."""
         await self.logout_all_containers()
+        logger.info(f"Disconnected from {self.url}")
         self.token = None
         self.connected = False
-        logger.info(f"Disconnected")
+        self.url = ''
 
     async def get_extra_ports(self) -> list[dict[str, Any]]:
         if not self.url: return []
@@ -65,7 +66,7 @@ class OpacaClient(AsyncOpacaClient):
             tmp = {}
             for container in containers:
                 cid = container.containerId
-                token = self.container_tokens[cid]
+                token = self.container_tokens.get(cid)
                 for k, v in container.connectivity["extraPortMappings"].items():
                     if v["protocol"] == "TCP":
                         url = f'{container.connectivity["publicUrl"]}:{k}'

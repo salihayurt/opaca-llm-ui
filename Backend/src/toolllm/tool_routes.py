@@ -101,7 +101,7 @@ class ToolLLMMethod(AbstractMethod):
             full_err = '\n'
             while (err_msg := await self.check_valid_action(result.tools)) and correction_limit < 3:
                 for tool in result.tools:
-                    await self.send_to_websocket(ToolResultMessage(id=tool.id, result="[invalid]"))
+                    await self.send_to_websocket(ToolResultMessage(id=tool.id, result="[invalid]", chat_id=self.chat.chat_id))
                 full_err += err_msg
                 result = await self.call_llm(
                     model_config=config.tool_gen_model,
