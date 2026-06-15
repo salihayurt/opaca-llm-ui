@@ -78,6 +78,9 @@ export interface Chat {
     responses: QueryResponse[];
     time_created: string;
     time_modified: string;
+    is_aborted: boolean;
+    is_finished: boolean;
+    active_files: string[];
 }
 
 export interface SearchResult {
@@ -92,7 +95,6 @@ export interface OpacaFile {
     content_type: string;
     file_name: string;
     host_ids: Record<string, string>;
-    suspended: boolean;
 }
 
 export interface ScheduledTask {

@@ -11,7 +11,7 @@ import litellm
 from fastapi import UploadFile
 from starlette.datastructures import Headers
 
-from .models import SessionData, OpacaFile, OpacaException
+from .models import SessionData, OpacaFile, OpacaException, Chat
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 FILES_PATH = './data/files'
 
 
-async def upload_files(session: SessionData, model: str):
+async def upload_files(session: SessionData, chat: Chat, model: str):
     """Uploads all unsent files to the connected LLM. Returns a list of file messages including file IDs."""
 
     host = model.rsplit("/", 1)[0]
@@ -30,7 +30,7 @@ async def upload_files(session: SessionData, model: str):
     # Upload all files that haven't been uploaded to this host
     for file_id, file_data in session.uploaded_files.items():
         # Skip suspended files
-        if file_data.suspended:
+        if file_id not in chat.active_files:
             continue
 
         # Check if the selected host supports file upload
@@ -65,14 +65,14 @@ async def upload_files(session: SessionData, model: str):
         file_data.host_ids[host] = uploaded.id
 
     parts = []
-    for filedata in session.uploaded_files.values():
-        if filedata.suspended or (host not in filedata.host_ids):
+    for file_id, file_data in session.uploaded_files.items():
+        if (file_id not in chat.active_files) or (host not in file_data.host_ids):
             continue
 
-        if is_image(filedata.file_name) and model_supports_vision:
-            parts.append({"type": "input_image", "file_id": filedata.host_ids[host]})
+        if is_image(file_data.file_name) and model_supports_vision:
+            parts.append({"type": "input_image", "file_id": file_data.host_ids[host]})
         else:
-            parts.append({"type": "input_file", "file_id": filedata.host_ids[host]})
+            parts.append({"type": "input_file", "file_id": file_data.host_ids[host]})
 
     return parts
 

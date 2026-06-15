@@ -21,9 +21,9 @@ from starlette.datastructures import Headers
 from openai import OpenAI
 
 from . import sample_prompts as prompts
-from .models import ConnectRequest, MCPToolApproval, QueryRequest, QueryResponse, ConfigPayload, Chat, RestrictedActions, \
-    SearchResult, get_supported_models, SessionData, OpacaException, MCPCreateMessage, PushMessage, \
-    InvokeRequest, InvokeResponse, SessionPrompts, ReloadChatsMessage
+from .models import ConnectRequest, ToolApprovalUpdateRequest, QueryRequest, QueryResponse, ConfigPayload, Chat, RestrictedActions, \
+    SearchResult, get_supported_models, SessionData, OpacaException, MCPCreateRequest, PushMessage, \
+    InvokeRequest, InvokeResponse, SessionPrompts, ReloadChatsMessage, OpacaFile
 from .simple import SimpleMethod
 from .simple_tools import SimpleToolsMethod
 from .toolllm import ToolLLMMethod
@@ -226,6 +226,17 @@ async def delete_container(container_id: str, session: SessionData = Depends(han
     await session.opaca_client.stop_container(container_id)
 
 
+@app.get("/containers/{container_id}/approval", description="Get per-tool approvals for a specific container.", tags=["opaca"])
+async def get_container_approvals(container_id: str, session: SessionData = Depends(handle_session_http)) -> dict:
+    return session.opaca_approvals.get(container_id, {})
+
+
+@app.patch("/containers/{container_id}/approval", description="Update tool approval for a specific tool inside a container.", tags=["opaca"])
+async def update_container_approval(container_id: str, data: ToolApprovalUpdateRequest, session: SessionData = Depends(handle_session_http)) -> Response:
+    session.set_opaca_tool_approval(container_id, data.tool_name, data.approval)
+    return Response(status_code=204)
+
+
 @app.post("/invoke", description="Invoke OPACA action directly.", tags=["opaca"])
 async def invoke_action(invoke: InvokeRequest, session: SessionData = Depends(handle_session_http)) -> InvokeResponse:
     try:
@@ -259,7 +270,7 @@ async def get_mcp_list(session: SessionData = Depends(handle_session_http)) -> D
 
 
 @app.post("/mcp", description="Add a new MCP server to the list of available MCP servers", tags=["mcp"])
-async def add_mcp_server(mcp: MCPCreateMessage, session: SessionData = Depends(handle_session_http)) -> Response:
+async def add_mcp_server(mcp: MCPCreateRequest, session: SessionData = Depends(handle_session_http)) -> Response:
     await session.add_mcp_server(mcp.content)
     return Response(status_code=201)
 
@@ -272,7 +283,7 @@ async def delete_mcp_server(server_label: str, session: SessionData = Depends(ha
         return Response(status_code=404, content="No matching mcp server found!")
 
 @app.patch("/mcp/{server_label}/approval", description="Set whether a tool call should be allowed, denied, or require confirmation by the user.", tags=["mcp"])
-async def update_mcp_tool_approval(data: MCPToolApproval, server_label: str, session: SessionData = Depends(handle_session_http)) -> Response:
+async def update_mcp_tool_approval(data: ToolApprovalUpdateRequest, server_label: str, session: SessionData = Depends(handle_session_http)) -> Response:
     await session.set_mcp_tool_approval(server_label, data.tool_name, data.approval)
     return Response(status_code=204)
 
@@ -282,7 +293,8 @@ async def update_mcp_tool_approval(data: MCPToolApproval, server_label: str, ses
 async def get_chats(session: SessionData = Depends(handle_session_http)) -> List[Chat]:
     chats = [
         Chat(chat_id=chat.chat_id, name=chat.name, is_finished=chat.is_finished,
-             time_created=chat.time_created, time_modified=chat.time_modified)
+             time_created=chat.time_created, time_modified=chat.time_modified,
+             active_files=chat.active_files,)
         for chat in session.chats.values()
     ]
     chats.sort(key=lambda chat: chat.time_modified, reverse=True)
@@ -312,13 +324,21 @@ async def query_chat(method: str, chat_id: str, message: QueryRequest, session: 
     finally:
         chat.is_finished = True
         await session.websocket_send(ReloadChatsMessage())
-        return response
+
+    return response
 
 
 @app.put("/chats/{chat_id}", description="Update a chat's name.", tags=["chat"])
-async def update_chat(chat_id: str, new_name: str, session: SessionData = Depends(handle_session_http)) -> None:
-    chat = session.get_or_create_chat(chat_id)
-    chat.name = new_name
+async def update_chat(chat_id: str, new_name: str | None = None, active_files: Dict[str, bool] | None = None, session: SessionData = Depends(handle_session_http)) -> None:
+    chat = session.get_or_create_chat(chat_id, True)
+
+    if new_name is not None:
+        chat.name = new_name
+
+    if active_files is not None:
+        chat.active_files -= {file_id for file_id, is_active in active_files.items() if not is_active}
+        chat.active_files |= {file_id for file_id, is_active in active_files.items() if is_active}
+
     chat.update_modified()
 
 
@@ -413,8 +433,9 @@ async def get_files(session: SessionData = Depends(handle_session_http)) -> dict
 
 
 @app.post("/files", description="Upload a file to the backend, to be sent to the LLM for consideration with the next user queries.", tags=["files"])
-async def upload_files(files: List[UploadFile], session: SessionData = Depends(handle_session_http)):
-    uploaded = []
+async def upload_files(chat_id: str | None = None, files: List[UploadFile] | None = None, session: SessionData = Depends(handle_session_http)):
+    if files is None: files = []
+    uploaded: List[OpacaFile] = []
     for file in files:
         try:
             filedata = await save_file_to_disk(file, session)
@@ -425,34 +446,43 @@ async def upload_files(files: List[UploadFile], session: SessionData = Depends(h
                 detail=f"Failed to process file {file.filename}: {str(e)}"
             )
 
-    return {"uploaded_files": uploaded}
+    if chat_id is not None:
+        chat = session.get_or_create_chat(chat_id, True)
+        chat.active_files |= {file.file_id for file in uploaded}
+
+    return {"uploadedFiles": uploaded}
 
 
 @app.delete("/files/{file_id}", description="Delete an uploaded file.", tags=["files"])
 async def delete_file(file_id: str, ignore_error: bool = False, session: SessionData = Depends(handle_session_http)) -> bool:
     files = session.uploaded_files
 
-    if file_id in files:
-        delete_file_from_disk(session.session_id, file_id)
-        result = await delete_file_from_all_clients(session, file_id, ignore_error)
-        return result
+    if file_id not in files:
+        return False
 
-    return False
+    # remove from all chats
+    for chat in session.chats.values():
+        if file_id in chat.active_files:
+            chat.active_files.remove(file_id)
+
+    delete_file_from_disk(session.session_id, file_id)
+    return await delete_file_from_all_clients(session, file_id, ignore_error)
+
+
 
 
 @app.patch("/files/{file_id}", description="Mark a file as suspended or unsuspended.", tags=["files"])
-async def update_file(file_id: str, suspend: bool = None, name: str = None, session: SessionData = Depends(handle_session_http)) -> bool:
+async def update_file(file_id: str, name: str | None = None, session: SessionData = Depends(handle_session_http)) -> bool:
     files = session.uploaded_files
 
-    if file_id in files:
-        file = files[file_id]
-        if suspend is not None:
-            file.suspended = suspend
-        if name is not None:
-            rename_file(file, name)
-        return True
+    if file_id not in files:
+        return False
 
-    return False
+    if name is not None:
+        rename_file(files[file_id], name)
+
+    return True
+
 
 
 @app.get("/files/{file_id}/view", description="Serve a previously uploaded file for preview.", tags=["files"])

@@ -325,7 +325,7 @@ export default {
                     await backendClient.append(chatId, pushMessage, values.autoAppend);
                     // refresh current chat history and chats sidebar
                     await this.$refs.content.loadHistory(chatId, false);
-                    await this.$refs.content.$refs.sidebar.$refs.chats.updateChats();
+                    await this.$refs.content.$refs.sidebar.updateChats();
                 }
             );
         },
@@ -353,7 +353,7 @@ export default {
         // to ensure that all those steps are executed sequentially and no redundant sessions are created!
         const sidebars = await this.$refs.content.$refs.sidebar.$refs;
         await sidebars.files.updateFiles();
-        await sidebars.chats.updateChats();
+        await this.$refs.content.$refs.sidebar.updateChats();
         await sidebars.config.fetchMethodConfig();
         await sidebars.questions.loadPrompts();
         // open permanent websocket connection to backend for "push notifications" to the UI

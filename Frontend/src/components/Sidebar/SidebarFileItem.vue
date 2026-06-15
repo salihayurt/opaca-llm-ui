@@ -1,6 +1,6 @@
 <template>
     <div class="file align-items-center"
-         :class="{ 'file-suspended': file.suspended }"
+         :class="{ 'file-suspended': !this.isFileActive() }"
          @click.stop="this.viewFile()">
         <input
             class="file-name"
@@ -15,11 +15,11 @@
         />
         <i :class="[
             'fa fa-lg',
-            file.suspended ? 'fa-toggle-off' : 'fa-toggle-on',
+            this.isFileActive()? 'fa-toggle-on' : 'fa-toggle-off',
             'ms-auto',
             'file-menu-button'
             ]"
-           @click.stop="this.suspendFile()"
+           @click.stop="this.activateFile()"
            :title="Localizer.get('files_include')"
         />
         <i class="fa fa-pen-to-square file-menu-button"
@@ -37,18 +37,22 @@
 import Localizer from "../../Localizer.js";
 import conf from "../../../config.js";
 import {nextTick} from "vue";
+import backendClient from "../../utils.js";
 
 export default {
     name: 'SidebarFileItem',
     props: {
         fileId: String,
         file: Object,
+        selectedChatId: String,
+        chats: Array,
     },
     emits: [
         'delete-file',
-        'suspend-file',
         'view-file',
         'rename-file',
+        'update-chats',
+        'update-files',
     ],
     setup() {
         return { Localizer }
@@ -66,8 +70,15 @@ export default {
             }
         },
 
-        suspendFile() {
-            this.$emit('suspend-file', this.fileId, !this.file.suspended);
+        async activateFile() {
+            try {
+                const body = { [this.fileId]: !this.isFileActive() };
+                await backendClient.setFilesActive(this.selectedChatId, body);
+                this.$emit('update-chats');
+                this.$emit('update-files');
+            } catch (e) {
+                console.error(`Failed to de/activate file: ${e}`);
+            }
         },
 
         viewFile() {
@@ -115,6 +126,11 @@ export default {
             if (this.isEditingName) {
                 event.stopPropagation();
             }
+        },
+
+        isFileActive() {
+            const chat = this.chats?.find(chat => chat.chat_id === this.selectedChatId);
+            return chat?.active_files?.includes(this.fileId);
         },
 
     },

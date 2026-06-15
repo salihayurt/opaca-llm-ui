@@ -67,6 +67,7 @@ export default {
     components: {SearchChatsOverlay, SidebarChatItem},
     props: {
         selectedChatId: String,
+        chats: Array,
     },
     setup() {
         const {isMobile} = useDevice();
@@ -79,6 +80,7 @@ export default {
         'new-chat',
         'goto-search-result',
         'delete-all-chats',
+        'update-chats',
     ],
     data() {
         return {
@@ -90,12 +92,7 @@ export default {
     },
     methods: {
         async updateChats() {
-            try {
-                this.chats = await backendClient.chats();
-            } catch (error) {
-                console.error(error);
-                this.chats = [];
-            }
+            this.$emit('update-chats');
         },
 
         markChatMissed(chatId) {

@@ -27,9 +27,8 @@
             @select-chat="chatId => this.handleSelectChat(chatId)"
             @delete-chat="chatId => this.handleDeleteChat(chatId)"
             @rename-chat="(chatId, newName) => this.handleRenameChat(chatId, newName)"
-            @new-chat="() => {this.suspendAllFiles(); this.startNewChat()}"
+            @new-chat="() => this.startNewChat()"
             @delete-file="fileId => this.handleDeleteFile(fileId)"
-            @suspend-file="(fileId, suspend) => this.handleSuspendFile(fileId, suspend)"
             @view-file="openViewer"
             @rename-file="handleRenameFile"
             @goto-search-result="(chatId, messageId) => this.gotoSearchResult(chatId, messageId)"
@@ -365,9 +364,10 @@ export default {
             } finally {
                 if (this.selectedChatId === chatId) {
                     // always set to completed, even in case of error, e.g. timeout
-                    this.getLastBubble().toggleLoading(false);
+                    aiBubble.toggleLoading(false);
                     this.startAutoSpeak();
                     this.scrollDownChat();
+                    await this.$refs.sidebar.updateChats();
                 }
             }
         },
@@ -498,18 +498,21 @@ export default {
             const wrappedFiles = files.map(file => ({
                 file,
                 fileId: null,
-                isUploading: true
+                isUploading: true,
             }));
             this.selectedFiles.push(...wrappedFiles);
 
             try {
-                const result = await backendClient.uploadFiles(files);
+                const result = await backendClient.uploadFiles(files, this.selectedChatId);
 
-                result.uploadedFiles.forEach((uploaded, idx) => {
+                result.uploadedFiles?.forEach((uploaded, idx) => {
                     const wrapper = wrappedFiles[idx];
                     wrapper.fileId = uploaded.file_id;
                     wrapper.isUploading = false;
                 });
+
+                await this.$refs.sidebar.$refs.files.updateFiles();
+                await this.$refs.sidebar.updateChats();
             } catch (error) {
                 console.error("File upload failed:", error);
                 this.showInfo("File upload failed. See console for details.");
@@ -539,21 +542,6 @@ export default {
             } else {
                 await this.$refs.sidebar.$refs.files.updateFiles();
             }
-        },
-
-        async handleSuspendFile(fileId, suspend) {
-            await backendClient.suspendFile(fileId, suspend);
-            await this.$refs.sidebar.$refs.files.updateFiles();
-        },
-
-        async suspendAllFiles() {
-            const files = await backendClient.files();
-            for (const file of Object.values(files)) {
-                if (!file.suspended) {
-                    await backendClient.suspendFile(file.file_id, true);
-                }
-            }
-            await this.$refs.sidebar.$refs.files.updateFiles();
         },
 
         async handleRenameFile(fileId, newName) {
@@ -592,7 +580,7 @@ export default {
             }
 
             if (result.type === 'ReloadChatsMessage') {
-                await this.$refs.sidebar.$refs.chats.updateChats();
+                await this.$refs.sidebar.updateChats();
             }
 
             if (result.type === "ConfirmActionNotification") {
@@ -813,6 +801,7 @@ export default {
                     const isLoading = !chat.is_finished && index === numResponses - 1;
                     await this.addChatBubble(msg.content, false, isLoading);
                     await nextTick();
+                    const aiBubble = this.getLastBubble();
 
                     for (const agent_message of msg.agent_messages) {
                         const chunk = {
@@ -831,7 +820,6 @@ export default {
                             execution_time: agent_message.execution_time,
                             metrics: agent_message.response_metadata
                         };
-                        const aiBubble = this.getLastBubble();
                         aiBubble?.addMetric(metric)
                     }
                     if (msg.error) {
@@ -888,21 +876,21 @@ export default {
         async handleDeleteChat(chatId) {
             await this.startNewChat();
             await backendClient.delete(chatId);
-            await this.$refs.sidebar.$refs.chats.updateChats(chatId);
+            await this.$refs.sidebar.updateChats();
         },
 
         async handleRenameChat(chatId, newName) {
             try {
                 await backendClient.updateName(chatId, newName);
             } finally {
-                await this.$refs.sidebar.$refs.chats.updateChats(chatId);
+                await this.$refs.sidebar.updateChats();
             }
         },
 
         async handleDeleteAllChats() {
             await this.startNewChat();
             await backendClient.deleteAllChats();
-            await this.$refs.sidebar.$refs.chats.updateChats();
+            await this.$refs.sidebar.updateChats();
         },
 
         async startNewChat() {
