@@ -191,8 +191,8 @@ async def get_all_sessions() -> dict:
             "chats": [chat.name for chat in session.chats.values()],
             "files": [file.file_name for file in session.uploaded_files.values()],
             "tasks": [(task.query, task.interval, task.repetitions) for task in session.scheduled_tasks.values()],
-            "platform": session._opaca_client.url,
-            "container-logins": list(session._opaca_client.logged_in_containers.keys()),
+            "platform": session.opaca_client.url,
+            "container-logins": list(session.opaca_client.container_tokens.keys()),
             "user_api_keys": list(session._user_api_keys),
             "blocked": session.blocked,
         }

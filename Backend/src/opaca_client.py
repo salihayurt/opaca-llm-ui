@@ -2,11 +2,12 @@ import decimal
 import functools
 import logging
 import asyncio
-
 import requests
 import httpx
 import jsonref
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Any
+from opaca import AsyncOpacaClient
+from opaca.models import ActionDescription
 
 logger = logging.getLogger(__name__)
 
@@ -15,69 +16,66 @@ logger = logging.getLogger(__name__)
 actions_blacklist: List[str] = []
 
 
-class OpacaClient:
+class OpacaClient(AsyncOpacaClient):
     """
     Client for OPACA Runtime Platform, for establishing a connection, managing access tokens,
     getting list of available actions in different formats, and invoking actions.
     """
 
-    def __init__(self):
-        self.url = None
-        self.token = None
+    def __init__(self, url: str = ''):
+        super(OpacaClient, self).__init__(url=url)
         self.connected = False
         self.login_lock = asyncio.Lock()
-        self.logged_in_containers = {}  # Stores the container ids where the user is currently logged in
 
-    async def connect(self, url: str, user: str, pwd: str):
+    async def connect(self, url: str, user: str | None, pwd: str | None):
         """Connect with OPACA platform, get access token if necessary and try to fetch actions.
         Returns the original HTTP Status code returned by the OPACA Platform as the result body.
         """
         self.url = url
         self.connected = False
+        self.token = None
         try:
-            await self._get_token(user, pwd)
-            await self.get_containers()
+            if user and pwd:
+                await self.platform_login(username=user, password=pwd)
+            await self.get_info()
             self.connected = True
             logger.info(f"Connected to {url}")
             return 200
         except httpx.ConnectError as e:
             logger.warning(f"Could not connect: {e}")
-            self.url = None
+            self.url = ''
             return 404
         except httpx.HTTPStatusError as e:
             logger.warning(f"Connected with error: {e}")
-            self.url = None
-            return e.response.status_code if e.response is not None else 400
+            self.url = ''
+            return e.response.status_code if e.response else 400
 
     async def disconnect(self) -> None:
         """Clears authentication and connection state."""
         await self.logout_all_containers()
+        logger.info(f"Disconnected from {self.url}")
         self.token = None
-        self.url = None
         self.connected = False
-        logger.info(f"Disconnected")
+        self.url = ''
 
     async def get_extra_ports(self) -> list[dict[str, Any]]:
+        if not self.url: return []
         try:
-            if not self.url:
-                return []
-            async with httpx.AsyncClient() as client:
-                res = await client.get(f"{self.url}/containers", headers=self._headers())
-            res.raise_for_status()
+            containers = await self.get_containers()
             # build dict of all accessible extra codes
             tmp = {}
-            for container in res.json():
-                cid = container["containerId"]
-                token = self.logged_in_containers.get(cid)
-                for k, v in container["connectivity"]["extraPortMappings"].items():
+            for container in containers:
+                cid = container.containerId
+                token = self.container_tokens.get(cid)
+                for k, v in container.connectivity["extraPortMappings"].items():
                     if v["protocol"] == "TCP":
-                        url = f'{container["connectivity"]["publicUrl"]}:{k}'
+                        url = f'{container.connectivity["publicUrl"]}:{k}'
                         if token: url += f"?token={token}"
                         try:
                             requests.get(url).raise_for_status()
                             if cid not in tmp:
                                 tmp[cid] = {
-                                    "container": container["image"]["imageName"],
+                                    "container": container.image.imageName,
                                     "extraPorts": []
                                 }
                             tmp[cid]["extraPorts"].append(
@@ -91,82 +89,53 @@ class OpacaClient:
             logger.error(f"Could not get Extra-Ports: {e}")
             raise e
 
-    async def get_containers(self) -> list:
-        """Get actions of OPACA agents, in original OPACA format."""
-        try:
-            if not self.url:
-                return []
-            async with httpx.AsyncClient() as client:
-                res = await client.get(f"{self.url}/containers", headers=self._headers())
-            res.raise_for_status()
-            return res.json()
-        except Exception as e:
-            logger.error(f"Could not get Actions: {e}")
-            raise e
-    
-    async def deploy_container(self, post_container: dict, update: bool = False) -> None:
-        async with httpx.AsyncClient() as client:
-            if update:
-                res = await client.put(f"{self.url}/containers", json=post_container, headers=self._headers())
-            else:
-                res = await client.post(f"{self.url}/containers", json=post_container, headers=self._headers())
-        res.raise_for_status()
-    
-    async def stop_container(self, container_id: str) -> None:
-        if self.url:
-            async with httpx.AsyncClient() as client:
-                res = await client.delete(f"{self.url}/containers/{container_id}", headers=self._headers())
-            res.raise_for_status()
-
-    async def get_actions_simple(self) -> dict[str, List[Dict[str, Any]]]:
+    async def get_actions_simple(self) -> dict[str, List[ActionDescription]]:
         """Get actions of OPACA agents, grouped by agent, but a bit simplified: just agent-ids and actions"""
         return {
-            agent["agentId"]: agent["actions"]
+            agent.agentId: agent.actions
             for container in await self.get_containers()
-            for agent in container["agents"]
+            for agent in container.agents
         }
 
-    async def get_actions_openapi(self, inline_refs=False):
+    async def get_actions_openapi(self, inline_refs=False) -> dict:
         """Get actions of OPACA agents in OpenAPI format; if inline_refs is true, datatypes will be
         inlined directly into the action JSON instead of being a separate block.
         """
+        if not self.url: return {}
         try:
-            if not self.url:
-                return {}
-            async with httpx.AsyncClient() as client:
-                res = await client.get(f"{self.url}/v3/api-docs/actions", headers=self._headers())
-            res.raise_for_status()
+            res = await self._request('GET', '/v3/api-docs/actions')
             if inline_refs:
                 loader = functools.partial(jsonref.jsonloader, parse_float=decimal.Decimal)
                 return jsonref.load(res, loader=loader)
             else:
                 return res.json()
         except Exception as e:
-            logger.error(f"Could not get Actions: {e}")
+            logger.error(f"Failed to get OpenAPI actions: {e}")
             raise e
 
-    async def invoke_opaca_action(self, action: str, agent: Optional[str], params: dict) -> dict:
-        """Invoke the given OPACA agent at the given agent (or any agent) with given parameters."""
-        if any(x in agent.lower() or x in action.lower() for x in map(str.lower, actions_blacklist)):
-            raise Exception("Executing this action is currently not permitted.")
-        agent = f"/{agent}" if agent else ""
-        async with httpx.AsyncClient() as client:
-            res = await client.post(f"{self.url}/invoke/{action}{agent}", json=params, headers=self._headers(), timeout=None)
-        res.raise_for_status()
-        return res.json()
+    async def safe_invoke(self, action: str, agent: str | None, params: dict) -> Any | None:
+        """
+        Invoke the given OPACA agent at the given agent (or any agent) with
+        the given parameters. Considers blacklisted agents and actions.
+        """
+        blacklist = [a.lower() for a in actions_blacklist]
+        if any(x in action.lower() for x in blacklist):
+            raise Exception(f"Disallowed action: {action}")
+        if agent is not None and any(x in agent.lower() for x in blacklist):
+            raise Exception(f"Disallowed agent: {agent}")
+
+        try:
+            return await self.invoke(action, agent, args=params)
+        except Exception as e:
+            logger.error(f"Failed to invoke action {action!r}: {e}")
+            raise e
 
     async def container_login(self, container_id: str, username: str, password: str):
-        """Initiate container login for OPACA RP"""
-        logger.info(f"Login to container {container_id}")
-        async with httpx.AsyncClient() as client:
-            res = await client.post(f"{self.url}/containers/login/{container_id}", json={"username": username, "password": password}, headers=self._headers(), timeout=None)
-        res.raise_for_status()
-
-        # Mark container as logged in
-        self.logged_in_containers[container_id] = res.text
+        await super().container_login(container_id, username, password)
+        logger.info(f"Logged into container {container_id}")
 
     async def logout_all_containers(self):
-        for cid in list(self.logged_in_containers):
+        for cid in list(self.container_tokens.keys()):
             await self.deferred_container_logout(cid, 0)
 
     async def deferred_container_logout(self, container_id: str, delay_seconds: int):
@@ -177,33 +146,18 @@ class OpacaClient:
             # finally -> make sure that logout still happens even if backend is shut down
             # login-lock -> make sure that container is not logged out while 2nd invoke-attempt is in locked-state
             async with self.login_lock:
-                # If container was logged out during sleep, do not logout again
-                if container_id not in self.logged_in_containers:
-                    return
+                logger.info(f"Logged out of container {container_id}")
+                await self.container_logout(container_id)
 
-                logger.info(f"Logout of container {container_id}")
-                async with httpx.AsyncClient() as client:
-                    await client.post(f"{self.url}/containers/logout/{container_id}", headers=self._headers())
-                    del self.logged_in_containers[container_id]
 
     async def get_most_likely_container_id(self, agent: str, action: str) -> tuple[str, str]:
         """Get most likely container id and name for given agent and action. Returns empty string if no match found."""
-        async with httpx.AsyncClient() as client:
-            res = await client.get(f"{self.url}/containers", headers=self._headers())
-        res.raise_for_status()
+        containers = await self.get_containers()
 
         # Return the containerId and container name of the first matching container to include the given agent and action
-        return next((c["containerId"], c["image"].get("name") or c["image"]["imageName"]) for c in res.json()
-                    for a in c["agents"] if a["agentId"] == agent and any(action == ac["name"] for ac in a["actions"]))
-
-    def _headers(self):
-        return {'Authorization': f'Bearer {self.token}'} if self.token else None
-
-    async def _get_token(self, user, pwd):
-        """Get and store JWT access token for OPACA RP"""
-        self.token = None
-        if user:
-            async with httpx.AsyncClient() as client:
-                res = await client.post(f"{self.url}/login", json={"username": user, "password": pwd})
-            res.raise_for_status()
-            self.token = res.text
+        return next(
+            (c.containerId, c.image.name or c.image.imageName)
+            for c in containers
+            for a in c.agents
+            if a.agentId == agent and any(action == ac.name for ac in a.actions)
+        )
