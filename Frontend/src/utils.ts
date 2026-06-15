@@ -231,12 +231,6 @@ class BackendClient {
         await this.sendRequest("PATCH", `mcp/${serverLabel}/approval`, body);
     }
 
-    // auth
-
-    async auth_me() {
-        return await this.sendRequest("GET", "users/me", null, 10000)
-    }
-
     // internal helper
 
     async sendRequest(method: Method | string, path: string, body: any = null, timeout: number = 10000): Promise<any> {

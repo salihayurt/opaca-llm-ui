@@ -392,7 +392,7 @@ class SessionData(BaseModel):
     the server is using the same method for waiting for the webserver to be closed again.
     """
     session_id: str = Field(default_factory=lambda: str(uuid.uuid4()), alias='_id')
-    authenticated_user_id: str = Field(default=None, alias='authenticated_user_id')
+    user_id: str = ""
     chats: Dict[str, Chat] = Field(default_factory=dict)
     config: Dict[str, Any] = Field(default_factory=dict)
     uploaded_files: Dict[str, OpacaFile] = Field(default_factory=dict)
@@ -632,15 +632,6 @@ class ExecutionResult(BaseModel):
     status: str
     stdout: str | None = None
     stderr: str | None = None
-
-
-# USERS
-
-class UserAuthenticationResponse(BaseModel):
-    email: str
-    display_name: str
-    authenticated: bool
-    # TODO return user settings and chats here as well?
 
 
 # CUSTOM EXCEPTIONS

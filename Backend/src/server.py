@@ -36,7 +36,7 @@ from .internal_tools import InternalTools
 from .code_execution import CodeExecutor
 from .file_utils import delete_file_from_all_clients, save_file_to_disk, create_path, delete_file_from_disk, rename_file
 from .session_manager import create_or_refresh_session, cleanup_task, on_shutdown, load_all_sessions, \
-    restore_scheduled_tasks, get_all_sessions, update_session, SessionAction
+    restore_scheduled_tasks, get_all_sessions, update_session, SessionAction, get_user_session
 from .opaca_client import actions_blacklist
 from .abstract_method import actions_needing_confirmation
 
@@ -584,59 +584,6 @@ async def whisper_generate(text: str = Query(""), voice: str = Query("alloy")) -
     )
 
 
-# USERS
-
-@app.get("/users/me", tags=["user"])
-async def get_me(authorization: str = Header(...)):
-
-    # TODO This is just for testing
-    def verify_token(token: str):
-
-        # Get JWKS from auth0 audience (API)
-        jwks = get_jwks()
-        header = jwt.get_unverified_header(token)
-
-        # Find matching key to decode token
-        rsa_key = {}
-        for key in jwks["keys"]:
-            if key["kid"] == header["kid"]:
-                rsa_key = {
-                    "kty": key["kty"],
-                    "kid": key["kid"],
-                    "use": key["use"],
-                    "n": key["n"],
-                    "e": key["e"],
-                }
-        if not rsa_key:
-            raise HTTPException(401, "No matching keys were found")
-
-        # Decode token and verify
-        payload = jwt.decode(
-            token,
-            rsa_key,
-            algorithms=["RS256"],
-            audience=os.getenv("VITE_AUTH0_AUDIENCE"),
-            issuer=f"https://{os.getenv('VITE_AUTH0_DOMAIN')}/",
-        )
-
-        return payload
-
-    try:
-        # Check if the token is a valid Bearer JWT
-        scheme, unverified_token = authorization.split()
-        if scheme != "Bearer":
-            raise HTTPException(401, "Invalid authorization scheme")
-        verified_token = verify_token(unverified_token)
-
-        # Return user-unique sub claim
-        # TODO This is just for testing purposes and should be removed before merging
-        return {
-            "user_id": verified_token.get("sub"),
-        }
-    except Exception as e:
-        raise HTTPException(401, f"Invalid authorization header: {e}")
-
-
 # WEBSOCKET CONNECTION (permanently opened)
 
 @app.websocket("/ws")
@@ -662,6 +609,38 @@ async def open_websocket(websocket: WebSocket, session: SessionData = Depends(ha
 
 ## HELPER FUNCTIONS
 
+def verify_token(token: str):
+
+    # Get JWKS from auth0 audience (API)
+    jwks = get_jwks()
+    header = jwt.get_unverified_header(token)
+
+    # Find matching key to decode token
+    rsa_key = {}
+    for key in jwks["keys"]:
+        if key["kid"] == header["kid"]:
+            rsa_key = {
+                "kty": key["kty"],
+                "kid": key["kid"],
+                "use": key["use"],
+                "n": key["n"],
+                "e": key["e"],
+            }
+    if not rsa_key:
+        raise HTTPException(401, "No matching keys were found")
+
+    # Decode token and verify
+    payload = jwt.decode(
+        token,
+        rsa_key,
+        algorithms=["RS256"],
+        audience=os.getenv("VITE_AUTH0_AUDIENCE"),
+        issuer=f"https://{os.getenv('VITE_AUTH0_DOMAIN')}/",
+    )
+
+    return payload
+
+
 async def handle_session_id(source: Union[Request, WebSocket], response: Optional[Response] = None) -> SessionData:
     """
     Unified session handler for both HTTP requests and WebSocket connections.
@@ -677,6 +656,22 @@ async def handle_session_id(source: Union[Request, WebSocket], response: Optiona
     if cookies:
         cookie_dict = dict(cookie.split("=", 1) for cookie in cookies.split("; "))
         session_id = cookie_dict.get("session_id", None)
+
+    # Check if Authorization is present in header
+    if session_id and (auth_header := source.headers.get("authorization")):
+
+        # Check if the token has the correct format
+        try:
+            scheme, token = auth_header.split(" ", 1)
+        except Exception as e:
+            raise HTTPException(400, "Malformed authorization header. Expected format: 'Bearer <token>'")
+
+        # Check if the token is valid and get the user sub claim (unique identifier)
+        user_sub = verify_token(token)["sub"]
+
+        # Return a user-linked session
+        # This will automatically create a new user session from the current session if no previous one existed
+        return await get_user_session(user_sub, session_id)
 
     max_age = 60 * 60 * 24 * 30  # 30 days
     # create Cookie (or just update max-age if already exists)

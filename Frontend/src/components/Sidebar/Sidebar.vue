@@ -274,19 +274,17 @@ export default {
         async handleProfileAuthClick() {
             if (this.isAuthenticated) {
                 await this.logout({ logoutParams: { returnTo: window.location.origin } });
-                // TODO logout "properly" from backend by removing all relevant user data
-                return
+            } else {
+                await this.loginWithPopup({authorizationParams: {screen_hint: 'signup'}})
             }
-            await this.loginWithPopup({ authorizationParams: { screen_hint: 'signup' }})
-
-            // TODO This call should get the current user data and propagate it
-            await backendClient.auth_me()
-
+            // Update the sidebar information to reflect the new user state
+            await this.updateSidebarUserInfo();
+            // MCP Servers need to be updated separately
+            await this.$refs.mcp.updateMcp(this.connected);
         },
 
         async handleProfileSettingsClick() {
-            // TODO this is just a test and should either be implemented or removed before merge
-            await backendClient.auth_me()
+            console.log("Not implemented yet.")
         },
 
         toggleSidebar() {
@@ -345,6 +343,15 @@ export default {
                 this.chats = [];
             }
         },
+
+        async updateSidebarUserInfo() {
+            // All-in-One Place to update user data in the sidebar
+            // Called by App.vue
+            await this.updateChats();
+            await this.$refs.files.updateFiles();
+            await this.$refs.config.fetchMethodConfig();
+            await this.$refs.questions.loadPrompts();
+        }
     },
     mounted() {
         this.setupResizer();

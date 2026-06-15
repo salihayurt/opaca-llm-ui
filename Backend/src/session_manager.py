@@ -148,6 +148,24 @@ def create_new_session(session_id: Optional[str] = None) -> SessionData:
     return session
 
 
+async def get_user_session(user_id: str, session_id: str) -> SessionData:
+    # At this point, all user ids can be assumed verified
+    session = next((session for session in sessions.values() if user_id == session.user_id), None)
+
+    # If no session was found by the user id, associate current session with it
+    # At this point, the user should always have a session associated with it
+    if not session:
+        old_session = await create_or_refresh_session(session_id)
+        # Create a new session but copy the old session's data
+        session = SessionData(**old_session.model_dump(exclude={"session_id", "user_id", "valid_until"}))
+        # Set the user id for the new session
+        session.user_id = user_id
+        # Save the session in the sessions
+        sessions[session.session_id] = session
+
+    return session
+
+
 async def store_sessions_in_db() -> None:
     if len(sessions) == 0: return
     logger.info(f'Storing data for {len(sessions)} sessions in database...')
@@ -187,6 +205,7 @@ async def get_all_sessions() -> dict:
     """
     return {
         _id: {
+            "user_id": session.user_id,
             "valid_until": datetime.fromtimestamp(session.valid_until).isoformat(),
             "chats": [chat.name for chat in session.chats.values()],
             "files": [file.file_name for file in session.uploaded_files.values()],
