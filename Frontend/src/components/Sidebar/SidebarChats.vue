@@ -44,9 +44,9 @@
     <div v-for="chat in chats" :key="chat.chat_id">
         <SidebarChatItem
             :selected-chat-id="this.selectedChatId"
-            :is-finished="this.isFinished"
             :chat-id="chat.chat_id"
             :chat="chat"
+            :has-missed-response="isChatMissed(chat.chat_id)"
             @select-chat="chatId => this.$emit('select-chat', chatId)"
             @delete-chat="chatId => this.$emit('delete-chat', chatId)"
             @rename-chat="(chatId, name) => this.$emit('rename-chat', chatId, name)"
@@ -58,7 +58,6 @@
 <script>
 import Localizer from "../../Localizer.js";
 import {useDevice} from "../../useIsMobile.js";
-import backendClient from "../../utils.js";
 import SidebarChatItem from "./SidebarChatItem.vue";
 import SearchChatsOverlay from "../SearchChatsOverlay.vue";
 
@@ -67,7 +66,6 @@ export default {
     components: {SearchChatsOverlay, SidebarChatItem},
     props: {
         selectedChatId: String,
-        isFinished: Boolean,
         chats: Array,
     },
     setup() {
@@ -85,6 +83,7 @@ export default {
     ],
     data() {
         return {
+            missedResponseChatIds: [],
             showChatMenu: false,
             isSearching: false,
         };
@@ -92,6 +91,23 @@ export default {
     methods: {
         async updateChats() {
             this.$emit('update-chats');
+        },
+
+        markChatMissed(chatId) {
+            if (!chatId || this.missedResponseChatIds.includes(chatId)) return;
+            this.missedResponseChatIds = [...this.missedResponseChatIds, chatId];
+        },
+
+        clearChatMissed(chatId = null) {
+            if (chatId) {
+                this.missedResponseChatIds = this.missedResponseChatIds.filter(id => id !== chatId);
+            } else {
+                this.missedResponseChatIds = [];
+            }
+        },
+
+        isChatMissed(chatId) {
+            return this.missedResponseChatIds.includes(chatId);
         },
 
         gotoSearchResult(chatId, messageId) {

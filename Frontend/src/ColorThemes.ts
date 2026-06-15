@@ -59,10 +59,14 @@ const currentTheme: Ref<string> = ref(conf.colorScheme);
 
 function getEffectiveColorTheme(): string {
     if (conf.colorScheme === 'system') {
-        return window.matchMedia('(prefers-color-scheme: dark)').matches
-            ? 'dark' : 'light';
+        return isBrowserDarkTheme() ? 'dark' : 'light';
     }
     return conf.colorScheme;
+}
+
+export function isBrowserDarkTheme(): boolean {
+    return typeof window !== "undefined"
+        && window.matchMedia("(prefers-color-scheme: dark)").matches;
 }
 
 export function getColorThemes(): Record<string, string> {
