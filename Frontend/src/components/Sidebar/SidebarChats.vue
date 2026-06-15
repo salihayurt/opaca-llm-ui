@@ -58,7 +58,6 @@
 <script>
 import Localizer from "../../Localizer.js";
 import {useDevice} from "../../useIsMobile.js";
-import backendClient from "../../utils.js";
 import SidebarChatItem from "./SidebarChatItem.vue";
 import SearchChatsOverlay from "../SearchChatsOverlay.vue";
 
@@ -84,7 +83,6 @@ export default {
     ],
     data() {
         return {
-            chats: [],
             missedResponseChatIds: [],
             showChatMenu: false,
             isSearching: false,
