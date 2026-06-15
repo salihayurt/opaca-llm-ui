@@ -1,7 +1,6 @@
 // @ts-ignore
 import conf from '../config';
 import axios, { type  Method } from "axios";
-import {useAuth0} from "@auth0/auth0-vue";
 import type {
     Container,
     PostContainerRequest,
@@ -18,12 +17,19 @@ import type {
     DebugMessage,
     RestrictedActions,
 } from "./models";
+import type {Ref} from "vue";
 
 class BackendClient {
 
-    init({ getTokenFn, isAuthenticated }) {
-        this.getTokenFn = getTokenFn
-        this.isAuthenticated = isAuthenticated
+    private getTokenFn!: () => Promise<String>;
+    private isAuthenticated!: Ref<boolean>;
+
+    init(params: {
+        getTokenFn: () => Promise<String>;
+        isAuthenticated: Ref<boolean>;
+    }) {
+        this.getTokenFn = params.getTokenFn;
+        this.isAuthenticated = params.isAuthenticated;
     }
 
     // OPACA connection
@@ -160,7 +166,7 @@ class BackendClient {
             headers: {
                 'Content-Type': 'multipart/form-data',
                 'Access-Control-Allow-Origin': '*',
-                'Authorization': this.isAuthenticated ? `Bearer ${this.getTokenFn()}` : ``
+                'Authorization': this.isAuthenticated.value ? `Bearer ${await this.getTokenFn()}` : ``
             }
         }).catch((error: any) => {
             console.error('Upload failed:', error);
@@ -228,18 +234,12 @@ class BackendClient {
     // auth
 
     async auth_me() {
-        const data = await this.sendRequest("GET", "users/me", null, 10000);
-        console.log(data)
-        return data
+        return await this.sendRequest("GET", "users/me", null, 10000)
     }
 
     // internal helper
 
     async sendRequest(method: Method | string, path: string, body: any = null, timeout: number = 10000): Promise<any> {
-        console.log(`${path}: ${this.isAuthenticated}`)
-        if (this.isAuthenticated) {
-            console.log(this.getTokenFn())
-        }
         const response = await axios.request({
             method: method as Method,
             url: `${conf.backendUrl}/${path}`,
@@ -249,7 +249,7 @@ class BackendClient {
             headers: {
                 'Content-Type': 'application/json',
                 'Access-Control-Allow-Origin': '*',
-                'Authorization': this.isAuthenticated ? `Bearer ${this.getTokenFn()}` : ``
+                'Authorization': this.isAuthenticated.value ? `Bearer ${await this.getTokenFn()}` : ``
             }
         });
         return response.data;

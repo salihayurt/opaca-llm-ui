@@ -157,7 +157,7 @@ export default {
         const { getAccessTokenSilently, isAuthenticated } = useAuth0();
         backendClient.init({
             getTokenFn: getAccessTokenSilently,
-            isAuthenticated: () => isAuthenticated
+            isAuthenticated: isAuthenticated
         })
         return { conf, Localizer, isMobile };
     },

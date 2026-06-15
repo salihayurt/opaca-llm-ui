@@ -6,10 +6,12 @@ and different routes for posting questions, updating the configuration, etc.
 import os
 import io
 import json
+from functools import lru_cache
 from typing import Dict, Any, List, Union, Optional
 from http import HTTPStatus
 
-from fastapi_plugin import Auth0FastAPI
+from jose import jwt
+import requests
 from httpx import HTTPStatusError
 import asyncio
 import logging
@@ -92,18 +94,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialize Auth0
-auth0 = Auth0FastAPI(
-    domain=os.getenv("AUTH0_DOMAIN"),
-    audience=os.getenv("AUTH0_AUDIENCE", "Not-set"),    # TODO what to use as default?
-)
-
 # SIMPLE AUTH FOR SELECTED ROUTES
 
 def require_password(x_api_password: str | None = Header(None)):
     admin_pwd = os.getenv('SESSION_ADMIN_PWD')
     if admin_pwd and x_api_password != admin_pwd:
         raise HTTPException(status_code=HTTPStatus.UNAUTHORIZED, detail="Unauthorized")
+
+
+# Auth0 HELPER TO GET PUBLIC KEYS (JWKS)
+
+@lru_cache
+def get_jwks():
+    # Request the JWKS from the auth0 tenant
+    return requests.get(f"https://{os.getenv('VITE_AUTH0_DOMAIN')}/.well-known/jwks.json").json()
 
 
 # SESSION HANDLING
@@ -583,12 +587,54 @@ async def whisper_generate(text: str = Query(""), voice: str = Query("alloy")) -
 # USERS
 
 @app.get("/users/me", tags=["user"])
-async def get_me(claims: dict = Depends(auth0.require_auth())):
-    return {
-        "user_id": claims.get("sub"),
-        "email": claims.get("email"),
-        "permissions": claims.get("permissions", []),
-    }
+async def get_me(authorization: str = Header(...)):
+
+    # TODO This is just for testing
+    def verify_token(token: str):
+
+        # Get JWKS from auth0 audience (API)
+        jwks = get_jwks()
+        header = jwt.get_unverified_header(token)
+
+        # Find matching key to decode token
+        rsa_key = {}
+        for key in jwks["keys"]:
+            if key["kid"] == header["kid"]:
+                rsa_key = {
+                    "kty": key["kty"],
+                    "kid": key["kid"],
+                    "use": key["use"],
+                    "n": key["n"],
+                    "e": key["e"],
+                }
+        if not rsa_key:
+            raise HTTPException(401, "No matching keys were found")
+
+        # Decode token and verify
+        payload = jwt.decode(
+            token,
+            rsa_key,
+            algorithms=["RS256"],
+            audience=os.getenv("VITE_AUTH0_AUDIENCE"),
+            issuer=f"https://{os.getenv('VITE_AUTH0_DOMAIN')}/",
+        )
+
+        return payload
+
+    try:
+        # Check if the token is a valid Bearer JWT
+        scheme, unverified_token = authorization.split()
+        if scheme != "Bearer":
+            raise HTTPException(401, "Invalid authorization scheme")
+        verified_token = verify_token(unverified_token)
+
+        # Return user-unique sub claim
+        # TODO This is just for testing purposes and should be removed before merging
+        return {
+            "user_id": verified_token.get("sub"),
+        }
+    except Exception as e:
+        raise HTTPException(401, f"Invalid authorization header: {e}")
 
 
 # WEBSOCKET CONNECTION (permanently opened)

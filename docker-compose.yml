@@ -41,8 +41,8 @@ services:
       MONGODB_URI: "mongodb://user:pass@session-db:27017"
       SESSION_ADMIN_PWD:
       LOCATION:
-      AUTH0_DOMAIN:
-      AUTH0_AUDIENCE:
+      VITE_AUTH0_DOMAIN:
+      VITE_AUTH0_AUDIENCE:
     volumes:
       - appdata:/app/data
 

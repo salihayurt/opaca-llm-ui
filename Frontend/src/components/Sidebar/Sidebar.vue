@@ -76,10 +76,16 @@
 
             <!-- Always Visible: User Profile -->
             <div class="sidebar-account-wrapper">
-                <i @click.stop="toggleProfileMenu()"
-                   class="fa fa-user sidebar-menu-item"
-                   :title="Localizer.get('sidebar_account')"
-                   v-bind:class="{'sidebar-menu-item-select': accountMenuOpen}"/>
+                <div class="sidebar-menu-item sidebar-avatar-wrapper"
+                     @click.stop="toggleProfileMenu()"
+                     :class="{'sidebar-menu-item-select': accountMenuOpen}"
+                     :title="Localizer.get('sidebar_account')">
+                     <img v-if="isAuthenticated && user?.picture"
+                          :src="user.picture"
+                          class="sidebar-avatar"
+                          alt="User avatar"/>
+                     <i v-else class="fa fa-user"/>
+                </div>
 
                 <div v-if="accountMenuOpen"
                      class="sidebar-account-menu"
@@ -259,7 +265,6 @@ export default {
     methods: {
         toggleProfileMenu() {
             this.accountMenuOpen = !this.accountMenuOpen;
-            console.log(`${this.isAuthenticated}`)
         },
 
         closeProfileMenu() {
@@ -269,18 +274,19 @@ export default {
         async handleProfileAuthClick() {
             if (this.isAuthenticated) {
                 await this.logout({ logoutParams: { returnTo: window.location.origin } });
-                // TODO logout from backend
+                // TODO logout "properly" from backend by removing all relevant user data
                 return
             }
             await this.loginWithPopup({ authorizationParams: { screen_hint: 'signup' }})
 
-            // Now call the /users/me endpoint to retrieve the current user data
+            // TODO This call should get the current user data and propagate it
             await backendClient.auth_me()
 
         },
 
-        handleProfileSettingsClick() {
-            this.closeProfileMenu();
+        async handleProfileSettingsClick() {
+            // TODO this is just a test and should either be implemented or removed before merge
+            await backendClient.auth_me()
         },
 
         toggleSidebar() {
@@ -481,6 +487,22 @@ export default {
 
 .sidebar-menu-toggle:hover {
     color: var(--primary-color);
+}
+
+.sidebar-avatar-wrapper {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+.sidebar-avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    object-fit: cover;
 }
 
 .resizer {
