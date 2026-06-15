@@ -131,7 +131,7 @@ async def test_logout_session(mock_post):
     user_session = await create_or_refresh_session("user")
 
     # Modify the container login list manually
-    user_session.opaca_client.logged_in_containers["example-container"] = "TestToken"
+    user_session.opaca_client.container_tokens["example-container"] = "TestToken"
 
     # Make sure the container login is present
     res = client.get("/admin/sessions", headers={"x-api-password": ADMIN_PWD})

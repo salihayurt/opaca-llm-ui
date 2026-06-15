@@ -16,6 +16,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Response, HTTPException, UploadFile, Depends, Header, Query
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
+from opaca.models import PostContainer
 from starlette.websockets import WebSocket
 from starlette.datastructures import Headers
 from openai import OpenAI
@@ -163,7 +164,7 @@ async def set_blacklist(restrictions: RestrictedActions, auth = Depends(require_
 
 
 @app.post("/connect", description="Connect to OPACA Runtime Platform. Returns the status code of the original request (to differentiate from errors resulting from this call itself).", tags=["opaca"])
-async def connect(connect: ConnectRequest, session: SessionData = Depends(handle_session_http)) -> int:
+async def platform_connect(connect: ConnectRequest, session: SessionData = Depends(handle_session_http)) -> int:
     return await session.opaca_client.connect(connect.url, connect.user, connect.pwd)
 
 
@@ -210,9 +211,12 @@ async def get_internal_tools(session: SessionData = Depends(handle_session_http)
 
 
 @app.post("/containers", description="Deploy or update container to connected OPACA Runtime Platform.", tags=["opaca"])
-async def post_container(post_container: dict, update: bool = False, session: SessionData = Depends(handle_session_http)) -> dict:
+async def post_container(data: PostContainer, update: bool = False, session: SessionData = Depends(handle_session_http)) -> dict:
     try:
-        await session.opaca_client.deploy_container(post_container, update)
+        if update:
+            await session.opaca_client.put_container(data)
+        else:
+            await session.opaca_client.post_container(data)
         return {"success": True}
     except HTTPStatusError as e:
         message = "Unauthorized" if e.response.status_code == 403 else unpack_error(e.response.json())
@@ -223,7 +227,7 @@ async def post_container(post_container: dict, update: bool = False, session: Se
 
 @app.delete("/containers/{container_id}", description="Undeploy container from connected OPACA Runtime Platform.", tags=["opaca"])
 async def delete_container(container_id: str, session: SessionData = Depends(handle_session_http)) -> None:
-    await session.opaca_client.stop_container(container_id)
+    await session.opaca_client.delete_container(container_id)
 
 
 @app.get("/containers/{container_id}/approval", description="Get per-tool approvals for a specific container.", tags=["opaca"])
@@ -240,7 +244,7 @@ async def update_container_approval(container_id: str, data: ToolApprovalUpdateR
 @app.post("/invoke", description="Invoke OPACA action directly.", tags=["opaca"])
 async def invoke_action(invoke: InvokeRequest, session: SessionData = Depends(handle_session_http)) -> InvokeResponse:
     try:
-        res = await session.opaca_client.invoke_opaca_action(invoke.action, invoke.agent, invoke.parameters)
+        res = await session.opaca_client.safe_invoke(invoke.action, invoke.agent, invoke.parameters)
         return InvokeResponse(success=True, result=res, error=None)
     except HTTPStatusError as e:
         return InvokeResponse(success=False, result=None, error=unpack_error(e.response.json()))
@@ -323,6 +327,8 @@ async def query_chat(method: str, chat_id: str, message: QueryRequest, session: 
         response.make_error_response(e)
     finally:
         chat.is_finished = True
+        await session.websocket_send(ReloadChatsMessage())
+
     return response
 
 

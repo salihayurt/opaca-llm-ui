@@ -147,6 +147,7 @@ import Notifications from './components/Notifications.vue';
 import OptionsSelect from "./components/OptionsSelect.vue";
 import CookieBanner from './components/CookieBanner.vue';
 import InputDialogue from './components/InputDialogue.vue';
+import {showDesktopNotification} from "./browserNotifications.js";
 
 export default {
     name: 'App',
@@ -238,20 +239,9 @@ export default {
             }
             if (response.type === "PushMessage")  {
                 notificationArea.addNotificationBubble(response);
-                this.showDesktopNotification(response.content);
+                showDesktopNotification(response.content);
                 this.pendingNotification = false;
                 this.unreadNotifications += 1;
-            }
-        },
-
-        async showDesktopNotification(text) {
-            const canShowNotification = (("Notification" in window) && (
-                Notification.permission === "granted" ||
-                Notification.permission !== "denied" && await (Notification.requestPermission() === "granted")
-            ));
-            if (canShowNotification) {
-                const notification = new Notification(text);
-                notification.onclick = (e) => { window.focus(); };
             }
         },
 
@@ -339,6 +329,7 @@ export default {
                 }
             );
         },
+
     },
 
     async mounted() {
@@ -367,7 +358,7 @@ export default {
         await sidebars.questions.loadPrompts();
         // open permanent websocket connection to backend for "push notifications" to the UI
         this.$refs.content.connectWebsocket();
-    }
+    },
 }
 </script>
 

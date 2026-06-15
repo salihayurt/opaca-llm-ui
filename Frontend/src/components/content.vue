@@ -22,7 +22,6 @@
         <Sidebar
             :connected="connected"
             :selected-chat-id="selectedChatId"
-            :is-finished="this.isChatFinished()"
             ref="sidebar"
             @select-question="question => this.handleSelectQuestion(question)"
             @select-chat="chatId => this.handleSelectChat(chatId)"
@@ -208,6 +207,11 @@ import FilePreview from "./FilePreview.vue";
 import FileViewer from "./FileViewer.vue";
 import InputDialogue from "./InputDialogue.vue";
 import FileDropHandler from "./FileDropHandler.vue";
+import {
+    clearMissedChatResponse as clearTabMissedChatResponse,
+    markMissedChatResponse as markTabMissedChatResponse,
+    showDesktopNotification,
+} from "../browserNotifications.js";
 
 export default {
     name: 'main-content',
@@ -224,6 +228,7 @@ export default {
         connected: Boolean,
     },
     emits: [
+        'action-confirmation-required',
         'container-login-required',
         'api-key-required',
         'new-notification',
@@ -245,6 +250,7 @@ export default {
             autoScrollEnabled: true,
             socket: null,
             viewerFile: null,
+            windowIsFocused: true,
         }
     },
     methods: {
@@ -271,8 +277,6 @@ export default {
                 // Clear files list after sending
                 this.selectedFiles = [];
 
-                // update chats list
-                await this.$refs.sidebar.updateChats();
             }
         },
 
@@ -328,6 +332,7 @@ export default {
         },
 
         async askChatGpt(userText, files = null) {
+            const chatId = this.selectedChatId;
             this.showExampleQuestions = false;
             this.newChat = false;
 
@@ -342,25 +347,80 @@ export default {
             await this.addChatBubble('', false, true);
             const aiBubble = this.getLastBubble();
             aiBubble.addStatusMessage('preparing', Localizer.get('chatbubble_preparing'), false);
+            this.clearMissedChatResponse(chatId);
 
             // get chat response (intermediate results are streamed via websocket)
             try {
-                const result = await backendClient.query(this.selectedChatId, conf.method, userText, true, 5*60*1000);
+                const result = await backendClient.query(chatId, conf.method, userText, true, 5*60*1000);
 
                 // display final result
-                if (result.error) {
-                    aiBubble.setError(result.error);
-                    this.$refs.sidebar.$refs.debug.addDebugMessage(`\n${result.content}\n\nCause: ${result.error}\n`, "ERROR");
+                if (this.selectedChatId === chatId) {
+                    this.applyFinalResponse(result, this.getLastBubble());
                 }
-                aiBubble.setContent(result.content);
-                this.syncStructuredAgentDebugMessages(result.agent_messages || []);
+
+                if (this.shouldNotifyChatResponse(chatId)) {
+                    this.markMissedChatResponse(chatId, result.content);
+                }
             } finally {
-                // always set to completed, even in case of error, e.g. timeout
-                aiBubble.toggleLoading(false);
-                this.startAutoSpeak();
-                this.scrollDownChat();
-                await this.$refs.sidebar.updateChats();
+                if (this.selectedChatId === chatId) {
+                    // always set to completed, even in case of error, e.g. timeout
+                    aiBubble.toggleLoading(false);
+                    this.startAutoSpeak();
+                    this.scrollDownChat();
+                    await this.$refs.sidebar.updateChats();
+                }
             }
+        },
+
+        applyFinalResponse(response, aiBubble) {
+            if (!response || !aiBubble) return;
+            if (response.error) {
+                aiBubble.setError(response.error);
+                this.$refs.sidebar.$refs.debug.addDebugMessage(`\n${response.content}\n\nCause: ${response.error}\n`, "ERROR");
+            }
+            aiBubble.setContent(response.content ?? '');
+            this.syncStructuredAgentDebugMessages(response.agent_messages || []);
+        },
+
+        shouldNotifyChatResponse(chatId) {
+            return !(chatId === this.selectedChatId
+                && !document.hidden
+                && this.windowIsFocused
+                && this.isMainContentVisible());
+        },
+
+        shouldShowSystemChatNotification() {
+            return document.hidden || !document.hasFocus() || ! this.windowIsFocused;
+        },
+
+        markMissedChatResponse(chatId, content) {
+            this.$refs.sidebar.$refs.chats.markChatMissed(chatId);
+            markTabMissedChatResponse(chatId);
+
+            if (this.shouldShowSystemChatNotification()) {
+                showDesktopNotification(
+                    Localizer.get('notification_chatFinished'),
+                    {
+                        body: this.createNotificationPreview(content) || null,
+                        onClick: async () => this.handleOpenMissedChatResponse(chatId),
+                    },
+                );
+            }
+        },
+
+        clearMissedChatResponse(chatId = null) {
+            this.$refs.sidebar.$refs.chats.clearChatMissed(chatId);
+            clearTabMissedChatResponse(chatId);
+        },
+
+        createNotificationPreview(content) {
+            const lines = (content ?? '')
+                .split(/\r?\n/)
+                .map(line => line.trim())
+                .filter(line => line.length > 0)
+                .slice(0, 3);
+            const preview = lines.join('\n');
+            return preview.length > 240 ? `${preview.substring(0, 237)}...` : preview;
         },
 
         async showInfo(message) {
@@ -514,7 +574,7 @@ export default {
             // selected chat.
             if (result.chat_id !== undefined && result.chat_id !== this.selectedChatId) {
                 return;
-            } else if (result.chat_id !== undefined && !this.messages || this.messages.length === 0) {
+            } else if (result.chat_id !== undefined && (!this.messages || this.messages.length === 0)) {
                 console.warn('No chat bubbles for streaming found.');
                 return;
             }
@@ -763,7 +823,7 @@ export default {
                         aiBubble?.addMetric(metric)
                     }
                     if (msg.error) {
-                        aiBubble.setError(msg.error);
+                        this.getLastBubble().setError(msg.error);
                     }
                 }
 
@@ -771,8 +831,9 @@ export default {
                     this.showExampleQuestions = false;
                     this.selectedChatId = chatId;
                     this.newChat = false;
-                    this.messages[this.messages.length - 1]
-                        .isLoading = true
+                    if (switchChat) {
+                        this.clearMissedChatResponse(chatId);
+                    }
                 }
 
             } catch (err) {
@@ -796,6 +857,20 @@ export default {
         async handleSelectChat(chatId) {
             await this.loadHistory(chatId);
             this.$refs.textInputRef.focus();
+        },
+
+        async handleOpenMissedChatResponse(chatId) {
+            await this.loadHistory(chatId);
+            this.$refs.textInputRef?.focus();
+            this.clearMissedChatResponse(chatId);
+        },
+
+        handleVisibilityChange() {
+            if (document.hidden) return;
+
+            if (this.selectedChatId && this.isMainContentVisible()) {
+                this.clearMissedChatResponse(this.selectedChatId);
+            }
         },
 
         async handleDeleteChat(chatId) {
@@ -894,7 +969,14 @@ export default {
     mounted() {
         this.startNewChat();
         this.updateScrollbarThumb();
+        document.addEventListener('visibilitychange', this.handleVisibilityChange);
+        window.addEventListener('focus', () => { this.windowIsFocused = true; });
+        window.addEventListener('blur',  () => { this.windowIsFocused = false; });
         addListener("selectedCategory", (category) => this.handleSelectCategory(category));
+    },
+    beforeUnmount() {
+        document.removeEventListener('visibilitychange', this.handleVisibilityChange);
+        clearTabMissedChatResponse();
     },
     watch: {
         textInput() {

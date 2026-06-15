@@ -1,6 +1,6 @@
 <template>
 <div class="chat align-items-center"
-     :class="{'chat-selected': this.selectedChatId === chatId/*, 'chat-disabled': !this.isFinished*/}"
+     :class="{'chat-selected': this.selectedChatId === chatId}"
      :title="this.getTooltip()"
      @click="this.select()" >
     <input
@@ -12,15 +12,23 @@
         @change="e => this.handleSubmitName(e)"
         @blur="e => this.handleCancelName(e)"
         @keyup.esc="e => this.handleCancelName(e)"
-        disabled
+        :disabled="!isEditingName"
+    />
+    <i v-if="isWorking()"
+       class="fa fa-spin fa-spinner chat-menu-button chat-status"
+       :title="Localizer.get('chats_working')"
+    />
+    <i v-else-if="hasMissedResponse"
+       class="fa fa-circle-exclamation chat-menu-button chat-status chat-status-ready"
+       :title="Localizer.get('chats_responseReady')"
     />
     <i class="fa fa-edit ms-auto chat-menu-button"
-       :class="{'chat-disabled': !this.isFinished}"
+       :class="{'chat-disabled': !this.canModify()}"
        @click.stop="this.rename()"
        :title="Localizer.get('chats_edit')"
     />
     <i class="fa fa-remove chat-menu-button"
-       :class="{'chat-disabled': !this.isFinished}"
+       :class="{'chat-disabled': !this.canModify()}"
        @click.stop="this.delete()"
        :title="Localizer.get('chats_delete')"
     />
@@ -34,9 +42,9 @@ export default {
     name: 'SidebarChatItem',
     props: {
         selectedChatId: String,
-        isFinished: Boolean,
         chatId: String,
         chat: Object,
+        hasMissedResponse: Boolean,
     },
     emits: [
         'select-chat',
@@ -54,45 +62,52 @@ export default {
     },
     methods: {
         select() {
-            // if (!this.isFinished) return;
             this.$emit('select-chat', this.chatId);
         },
 
-        rename() {
-            if (!this.isFinished) return;
+        async rename() {
+            if (!this.canModify()) return;
             this.isEditingName = true;
+            await this.$nextTick();
             const input = this.$refs.nameInput;
-            input.disabled = false;
             input.focus();
             input.select();
         },
 
         delete() {
-            if (!this.isFinished) return;
+            if (!this.canModify()) return;
             if (confirm(Localizer.get("chats_delete_confirm"))) {
                 this.$emit('delete-chat', this.chatId);
             }
         },
 
+        canModify() {
+            return !this.isWorking();
+        },
+
+        isWorking() {
+            return this.chat?.is_finished === false;
+        },
+
         handleSubmitName(event) {
+            if (!this.isEditingName) return;
             event.preventDefault();
             event.stopPropagation();
             this.isEditingName = false;
             const name = this.nameInput;
             this.$emit('rename-chat', this.chatId, this.nameInput);
             const input = this.$refs.nameInput;
-            input.disabled = true;
             input.scrollLeft = 0;
             input.blur();
-            this.nameInput = name; // reset input after blur triggered cancel
+            this.nameInput = name;
         },
 
         handleCancelName(event) {
+            if (!this.isEditingName) return;
             event.preventDefault();
             event.stopPropagation();
             this.isEditingName = false;
             const input = this.$refs.nameInput;
-            input.disabled = true;
             input.blur();
             this.nameInput = this.chat.name ? this.chat.name : this.chatId;
         },
@@ -116,6 +131,7 @@ export default {
     },
     watch: {
         chat() {
+            if (this.isEditingName) return;
             this.nameInput = this.chat.name ? this.chat.name : this.chatId;
         }
     }
@@ -206,5 +222,17 @@ export default {
 .chat-menu-button:hover {
     background-color: var(--input-color);
     color: var(--text-danger-color);
+}
+
+.chat-status,
+.chat-status:hover {
+    background-color: transparent;
+    color: var(--text-primary-color);
+    cursor: default;
+}
+
+.chat-status-ready,
+.chat-status-ready:hover {
+    color: var(--primary-color);
 }
 </style>

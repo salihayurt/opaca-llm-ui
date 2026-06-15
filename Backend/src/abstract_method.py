@@ -313,14 +313,14 @@ class AbstractMethod(ABC):
                 if agent_name == INTERNAL_TOOLS_AGENT_NAME:
                     t_result = await self.internal_tools.call_internal_tool(action_name, tool.args)
                 else:
-                    t_result = await self.session.opaca_client.invoke_opaca_action(action_name, agent_name, tool.args)
+                    t_result = await self.session.opaca_client.safe_invoke(action_name, agent_name, tool.args)
             except httpx.HTTPStatusError as e:
                 res = e.response.json()
                 t_result = f"Failed to invoke tool.\nStatus code: {e.response.status_code}\nResponse: {e.response.text}\nResponse JSON: {res}"
                 cause = res.get("cause", {}).get("message", "")
                 status = res.get("cause", {}).get("statusCode", -1)
                 if self.session.has_websocket() and (status in [401, 403] or ("401" in cause or "403" in cause or "credentials" in cause)):
-                    return await self.handleContainerLogin(agent_name, action_name, tool.name, tool.args, tool.id, login_attempt_retry)
+                    return await self.handle_container_login(agent_name, action_name, tool.name, tool.args, tool.id, login_attempt_retry)
             except Exception as e:
                 t_result = f"Failed to invoke tool.\nCause: {e}"
 
@@ -375,22 +375,22 @@ class AbstractMethod(ABC):
         return True
 
 
-    async def handleContainerLogin(self, agent_name: str, action_name: str, tool_name: str, tool_args: dict, tool_id: str, login_attempt_retry: bool = False):
+    async def handle_container_login(self, agent_name: str, action_name: str, tool_name: str, tool_args: dict, tool_id: str, login_attempt_retry: bool = False):
         """Handles failed tool invocation due to missing credentials."""
 
         # If a "missing credentials" error is encountered, initiate container login
         container_id, container_name = await self.session.opaca_client.get_most_likely_container_id(agent_name, action_name)
 
         # fix out-of-sync logged-in state, otherwise deadlock in retry within login-lock
-        if container_id in self.session.opaca_client.logged_in_containers:
-            del self.session.opaca_client.logged_in_containers[container_id]
+        if container_id in self.session.opaca_client.container_tokens:
+            del self.session.opaca_client.container_tokens[container_id]
 
         # This lock prevents more than one login-request message being sent to the UI at once. If multiple
         # invokes to actions of not-logged-in containers arrive, the second will wait here until the first
         # has been processed, and then immediately retry if it the same container, otherwise ask the user
         async with self.session.opaca_client.login_lock:
             # might already be logged in on lock-release if two actions of same container were called in parallel
-            if container_id in self.session.opaca_client.logged_in_containers:
+            if container_id in self.session.opaca_client.container_tokens:
                 return await self.invoke_tool(tool_name, tool_args, tool_id, True)
             while True:
                 # Get credentials from user
@@ -407,7 +407,7 @@ class AbstractMethod(ABC):
                 try:
                     await self.session.opaca_client.container_login(container_id, response.username, response.password)
                     break
-                except:
+                except Exception as e:
                     login_attempt_retry = True
 
         # login succeeded (or not checked by container) -> try to invoke the tool again
