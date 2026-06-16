@@ -320,7 +320,7 @@ class AbstractMethod(ABC):
                 cause = res.get("cause", {}).get("message", "")
                 status = res.get("cause", {}).get("statusCode", -1)
                 if self.session.has_websocket() and (status in [401, 403] or ("401" in cause or "403" in cause or "credentials" in cause)):
-                    return await self.handle_container_login(agent_name, action_name, tool.name, tool.args, tool.id, login_attempt_retry)
+                    return await self.handle_container_login(agent_name, action_name, tool, login_attempt_retry)
             except Exception as e:
                 t_result = f"Failed to invoke tool.\nCause: {e}"
 
@@ -375,7 +375,7 @@ class AbstractMethod(ABC):
         return True
 
 
-    async def handle_container_login(self, agent_name: str, action_name: str, tool_name: str, tool_args: dict, tool_id: str, login_attempt_retry: bool = False):
+    async def handle_container_login(self, agent_name: str, action_name: str, tool: ToolCall, login_attempt_retry: bool = False):
         """Handles failed tool invocation due to missing credentials."""
 
         # If a "missing credentials" error is encountered, initiate container login
@@ -391,17 +391,18 @@ class AbstractMethod(ABC):
         async with self.session.opaca_client.login_lock:
             # might already be logged in on lock-release if two actions of same container were called in parallel
             if container_id in self.session.opaca_client.container_tokens:
-                return await self.invoke_tool(tool_name, tool_args, tool_id, True)
+                return await self.invoke_tool(tool, True)
             while True:
                 # Get credentials from user
                 await self.session.websocket_send(ContainerLoginNotification(
                     container_name=container_name,
-                    tool_name=tool_name,
+                    tool_name=tool.name,
                     retry=login_attempt_retry
                 ))
                 response = ContainerLoginResponse(**await self.session.websocket_receive())
                 if not (response.username and response.password):
-                    return ToolCall(id=tool_id, type="opaca", name=tool_name, args=tool_args, result=f"Failed to invoke tool.\nNo credentials provided.")
+                    tool.result = "Failed to invoke tool.\nNo credentials provided."
+                    return tool
                 
                 # Attempt to login at container via OPACA (error if immediate login-check fails)
                 try:
@@ -411,7 +412,7 @@ class AbstractMethod(ABC):
                     login_attempt_retry = True
 
         # login succeeded (or not checked by container) -> try to invoke the tool again
-        res = await self.invoke_tool(tool_name, tool_args, tool_id, True)
+        res = await self.invoke_tool(tool, True)
 
         # Schedule a deferred logout based on the user-provided timeout
         asyncio.create_task(self.session.opaca_client.deferred_container_logout(container_id, response.timeout))
