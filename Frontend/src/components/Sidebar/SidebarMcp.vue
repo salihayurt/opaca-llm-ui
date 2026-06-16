@@ -50,9 +50,9 @@
                                     <i class="fa fa-wrench"/>
                                     <span class="position-absolute top-100 start-100 p-1 rounded-circle"
                                           :class="{
-                                              'bg-warning': getEffectiveApproval(mcp) === 'ask',
-                                              'bg-danger': getEffectiveApproval(mcp) === 'deny',
-                                              'bg-success': getEffectiveApproval(mcp) === 'allow'
+                                              'bg-approval-ask': getEffectiveApproval(mcp) === 'ask',
+                                              'bg-approval-deny': getEffectiveApproval(mcp) === 'deny',
+                                              'bg-approval-allow': getEffectiveApproval(mcp) === 'allow'
                                           }" style="outline: 2px solid var(--surface-color); transform: translate(-30%, -90%);">
                                         <span class="visually-hidden">Approval State</span>
                                     </span>
@@ -74,19 +74,19 @@
                                             @change="e => setApproval(mcp.server_label, mcp.name, 'ask')"
                                             :checked="getEffectiveApproval(mcp) === 'ask'"
                                             :disabled="isForbiddenApplied(mcp)">
-                                        <label class="btn btn-outline-secondary mcp-approval-ask" :for="'btn-ask-' + mcpServerIndex + '-' + mcpIndex">Ask</label>
+                                        <label class="btn btn-outline-secondary approval-ask" :for="'btn-ask-' + mcpServerIndex + '-' + mcpIndex">Ask</label>
 
                                         <input type="radio" class="btn-check" :name="'approval-' + mcpServerIndex + '-' + mcpIndex" :id="'btn-deny-' + mcpServerIndex + '-' + mcpIndex" autocomplete="off"
                                             @change="e => setApproval(mcp.server_label, mcp.name, 'deny')"
                                             :checked="getEffectiveApproval(mcp) === 'deny'"
                                             :disabled="isForbiddenApplied(mcp)">
-                                        <label class="btn btn-outline-secondary mcp-approval-deny" :for="'btn-deny-' + mcpServerIndex + '-' + mcpIndex">Deny</label>
+                                        <label class="btn btn-outline-secondary approval-deny" :for="'btn-deny-' + mcpServerIndex + '-' + mcpIndex">Deny</label>
 
                                         <input type="radio" class="btn-check" :name="'approval-' + mcpServerIndex + '-' + mcpIndex" :id="'btn-allow-' + mcpServerIndex + '-' + mcpIndex" autocomplete="off"
                                             @change="e => setApproval(mcp.server_label, mcp.name, 'allow')"
                                             :checked="getEffectiveApproval(mcp) === 'allow'"
                                             :disabled="isForbiddenApplied(mcp) || isConfirmationApplied(mcp)">
-                                        <label class="btn btn-outline-secondary mcp-approval-allow" :for="'btn-allow-' + mcpServerIndex + '-' + mcpIndex">Allow</label>
+                                        <label class="btn btn-outline-secondary approval-allow" :for="'btn-allow-' + mcpServerIndex + '-' + mcpIndex">Allow</label>
                                     </div>
                                 </div>
                             </div>
@@ -157,9 +157,9 @@ export default {
                     mcpServerUrl: {type: "text", label: "Server URL"},
                     mcpServerLabel: {type: "text", label: "Server Label (Optional)", optional: true},
                     mcpDefaultApproval: {type: "select", label: "Default Approval", default: "ask", values: {
-                        ask: "Always ask",
-                        allow: "Auto allow",
-                        deny: "Auto deny"
+                        ask: "Always Ask",
+                        allow: "Auto Allow",
+                        deny: "Auto Deny"
                     }},
                 },
                 async (values) => {
@@ -174,7 +174,7 @@ export default {
 
                     // Add MCP server to backend, retry on failure
                     try {
-                        await backendClient.addMcp({"content": data});
+                        await backendClient.addMcp(data);
                     } catch (err) {
                         throw new Error(err.response.data.detail);
                     }
@@ -317,24 +317,6 @@ export default {
 
 .delete-icon:hover {
     color: var(--text-danger-color);
-}
-
-.btn-check:checked + .btn.btn-outline-secondary.mcp-approval-ask {
-    background-color: #ffc107;
-    border-color: #ffc107;
-    color: #fff;
-}
-
-.btn-check:checked + .btn.btn-outline-secondary.mcp-approval-deny {
-    background-color: #dc3545;
-    border-color: #dc3545;
-    color: #fff;
-}
-
-.btn-check:checked + .btn.btn-outline-secondary.mcp-approval-allow {
-    background-color: #198754;
-    border-color: #198754;
-    color: #fff;
 }
 
 </style>

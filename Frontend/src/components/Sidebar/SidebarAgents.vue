@@ -92,9 +92,9 @@
                                                     <i class="fa fa-wrench"/>
                                                     <span class="position-absolute top-100 start-100 p-1 rounded-circle"
                                                           :class="{
-                                                              'bg-warning': getEffectiveApproval(agentId, action, approvals) === 'ask',
-                                                              'bg-danger': getEffectiveApproval(agentId, action, approvals) === 'deny',
-                                                              'bg-success': getEffectiveApproval(agentId, action, approvals) === 'allow'
+                                                              'bg-approval-ask': getEffectiveApproval(agentId, action, approvals) === 'ask',
+                                                              'bg-approval-deny': getEffectiveApproval(agentId, action, approvals) === 'deny',
+                                                              'bg-approval-allow': getEffectiveApproval(agentId, action, approvals) === 'allow'
                                                           }" style="outline: 2px solid var(--surface-color); transform: translate(-180%, -70%);">
                                                         <span class="visually-hidden">Approval State</span>
                                                     </span>
@@ -124,19 +124,19 @@
                                                         @change="e => setApproval(containerId, agentId, action.name, 'ask')"
                                                         :checked="getEffectiveApproval(agentId, action, approvals) === 'ask'"
                                                         :disabled="isForbiddenApplied(agentId, action)">
-                                                    <label class="btn btn-outline-secondary container-approval-ask" :for="`btn-ask-${containerId}-${agentIndex}-${actionIndex}`">Ask</label>
+                                                    <label class="btn btn-outline-secondary approval-ask" :for="`btn-ask-${containerId}-${agentIndex}-${actionIndex}`">Ask</label>
 
                                                     <input type="radio" class="btn-check" :name="`approval-${containerId}-${agentIndex}-${actionIndex}`" :id="`btn-deny-${containerId}-${agentIndex}-${actionIndex}`" autocomplete="off"
                                                         @change="e => setApproval(containerId, agentId, action.name, 'deny')"
                                                         :checked="getEffectiveApproval(agentId, action, approvals) === 'deny'"
                                                         :disabled="isForbiddenApplied(agentId, action)">
-                                                    <label class="btn btn-outline-secondary container-approval-deny" :for="`btn-deny-${containerId}-${agentIndex}-${actionIndex}`">Deny</label>
+                                                    <label class="btn btn-outline-secondary approval-deny" :for="`btn-deny-${containerId}-${agentIndex}-${actionIndex}`">Deny</label>
 
                                                     <input type="radio" class="btn-check" :name="`approval-${containerId}-${agentIndex}-${actionIndex}`" :id="`btn-allow-${containerId}-${agentIndex}-${actionIndex}`" autocomplete="off"
                                                         @change="e => setApproval(containerId, agentId, action.name, 'allow')"
                                                         :checked="getEffectiveApproval(agentId, action, approvals) === 'allow'"
                                                         :disabled="isForbiddenApplied(agentId, action) || isConfirmationApplied(agentId, action)">
-                                                    <label class="btn btn-outline-secondary container-approval-allow" :for="`btn-allow-${containerId}-${agentIndex}-${actionIndex}`">Allow</label>
+                                                    <label class="btn btn-outline-secondary approval-allow" :for="`btn-allow-${containerId}-${agentIndex}-${actionIndex}`">Allow</label>
                                                 </div>
                                             </div>
 
@@ -232,12 +232,7 @@ export default {
 
                 // Fetch approvals for each container
                 for (let container of allContainers) {
-                    try {
-                        const appRes = await backendClient.getContainerApprovals(container.containerId);
-                        container.approvals = appRes || {};
-                    } catch (err) {
-                        container.approvals = {};
-                    }
+                    container.approvals = await backendClient.getContainerApprovals(container.containerId);
                 }
 
                 this.platformContainers = allContainers;
@@ -585,21 +580,4 @@ export default {
     color: var(--text-danger-color);
 }
 
-.btn-check:checked + .btn.btn-outline-secondary.container-approval-ask {
-    background-color: #ffc107;
-    border-color: #ffc107;
-    color: #fff;
-}
-
-.btn-check:checked + .btn.btn-outline-secondary.container-approval-deny {
-    background-color: #dc3545;
-    border-color: #dc3545;
-    color: #fff;
-}
-
-.btn-check:checked + .btn.btn-outline-secondary.container-approval-allow {
-    background-color: #198754;
-    border-color: #198754;
-    color: #fff;
-}
 </style>

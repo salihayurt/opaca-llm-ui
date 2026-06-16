@@ -259,6 +259,30 @@ input[type="checkbox"] {
     border-radius: 0;
 }
 
+/* approval colors */
+.btn-check:checked + .btn.btn-outline-secondary.approval-ask,
+.bg-approval-ask {
+    background-color: var(--text-secondary-color) !important;
+    border-color: var(--text-secondary-color) !important;
+    color: var(--button-primary-color);
+}
+
+/* Deny State (Red) */
+.btn-check:checked + .btn.btn-outline-secondary.approval-deny,
+.bg-approval-deny {
+    background-color: var(--text-danger-color) !important;
+    border-color: var(--text-danger-color) !important;
+    color: var(--button-primary-color);
+}
+
+/* Allow State (Green) */
+.btn-check:checked + .btn.btn-outline-secondary.approval-allow,
+.bg-approval-allow {
+    background-color: var(--primary-color) !important;
+    border-color: var(--primary-color) !important;
+    color: var(--button-primary-color);
+}
+
 /* custom text colors classes */
 .text-success {
     color: var(--text-success-color) !important;
