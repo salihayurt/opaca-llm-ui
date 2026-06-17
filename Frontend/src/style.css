@@ -231,10 +231,12 @@ input[type="checkbox"] {
 .accordion-body {
     padding: 0;
     background-color: var(--background-color);
+    color: var(--text-primary-color);
 }
 
 .accordion-collapse {
     background-color: var(--background-color);
+    color: var(--text-primary-color);
 }
 
 /* override bootstrap list-group styling */
