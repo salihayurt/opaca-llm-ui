@@ -134,8 +134,8 @@ async def create_or_refresh_session(session_id: Optional[str], max_age: int = 0)
             # if session is valid and was loaded from DB, save into memory
             sessions[session_id] = session
 
-        # update session expiration
-        if max_age > 0:
+        # update session expiration for anonymous sessions
+        if max_age > 0 and not session.user_id:
             session.valid_until = time.time() + max_age
 
     return session
@@ -148,7 +148,7 @@ def create_new_session(session_id: Optional[str] = None) -> SessionData:
     return session
 
 
-async def get_user_session(user_id: str, session_id: str) -> SessionData:
+async def get_user_session(user_id: str, session_id: str, methods: dict[str, type['AbstractMethod']]) -> SessionData:
     # At this point, all user ids can be assumed verified
     session = next((session for session in sessions.values() if user_id == session.user_id), None)
 
@@ -157,11 +157,22 @@ async def get_user_session(user_id: str, session_id: str) -> SessionData:
     if not session:
         old_session = await create_or_refresh_session(session_id)
         # Create a new session but copy the old session's data
-        session = SessionData(**old_session.model_dump(exclude={"session_id", "user_id", "valid_until"}))
+        session = old_session.clone_model()
         # Set the user id for the new session
         session.user_id = user_id
         # Save the session in the sessions
         sessions[session.session_id] = session
+
+        # Move the scheduled tasks from the old session to the new one
+        for task_id in list(old_session.scheduled_tasks):
+            task = old_session.scheduled_tasks[task_id]
+            try:
+                await InternalTools(session, methods[task.method]).resume_scheduled_task(task)
+            except Exception as e:
+                logger.warning(f"Failed to move Scheduled Task {task_id} ({task.query}) for user {user_id} to new session.")
+            finally:
+                del old_session.scheduled_tasks[task_id]
+    # TODO Merge sessions if user session already existed but current session was filled with content (chats, prompts, ...)
 
     return session
 

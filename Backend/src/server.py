@@ -652,6 +652,9 @@ async def handle_session_id(source: Union[Request, WebSocket], response: Optiona
     cookies = headers.get("cookie")
     session_id = None
 
+    # Max age for session cookies
+    max_age = 60 * 60 * 24 * 30  # 30 days
+
     # Extract session_id from cookies
     if cookies:
         cookie_dict = dict(cookie.split("=", 1) for cookie in cookies.split("; "))
@@ -669,20 +672,19 @@ async def handle_session_id(source: Union[Request, WebSocket], response: Optiona
         # Check if the token is valid and get the user sub claim (unique identifier)
         user_sub = verify_token(token)["sub"]
 
-        # Return a user-linked session
         # This will automatically create a new user session from the current session if no previous one existed
-        return await get_user_session(user_sub, session_id)
+        session = await get_user_session(user_sub, session_id, METHODS)
+    else:
+        session = await create_or_refresh_session(session_id, max_age)
 
-    max_age = 60 * 60 * 24 * 30  # 30 days
-    # create Cookie (or just update max-age if already exists)
-    session = await create_or_refresh_session(session_id, max_age)
+    # If it's an HTTP request, and you want to set a cookie
+    # This will also set the session id for logged in users, important for the websocket connection
+    if response is not None:
+        # create Cookie (or just update max-age if already exists)
+        response.set_cookie("session_id", session.session_id, max_age=max_age)
 
     if session.blocked:
         raise OpacaException("The session has been blocked. If you think this is an error, please consult the platform administrator.")
-
-    # If it's an HTTP request, and you want to set a cookie
-    if response is not None:
-        response.set_cookie("session_id", session.session_id, max_age=max_age)
 
     # Return the session data for the session ID
     return session

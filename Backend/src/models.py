@@ -430,6 +430,18 @@ class SessionData(BaseModel):
     def is_valid(self) -> bool:
         return self.valid_until > time.time()
 
+    def clone_model(self) -> "SessionData":
+        """Clone the current model and return a new instance. Intended to create user sessions."""
+        new = SessionData(**self.model_dump(exclude={"session_id"}))
+        # Set "valid_until" to year 2100 to avoid deletion of the user session
+        new.valid_until = datetime(2100, 1, 1).timestamp()
+        new._websocket = self._websocket
+        new._ws_msg_queue = self._ws_msg_queue
+        new._ws_out_cache = self._ws_out_cache
+        new._opaca_client = self._opaca_client
+        new._user_api_keys = self._user_api_keys
+        return new
+
     def get_config(self, method) -> 'MethodConfig':
         config = self.config.get(method.NAME, method.CONFIG())
         if isinstance(config, dict):  # config is deserialized from DB as dict since the exact type is not known then
