@@ -64,11 +64,7 @@ class SimpleToolsMethod(AbstractMethod):
                 if not result.tools:
                     break
 
-                tasks = []
-                for call in result.tools:
-                    tasks.append(self.invoke_tool(call))
-                tool_entries = await asyncio.gather(*tasks)
-
+                tool_entries = await self.invoke_all_tools(result)
                 tool_contents = "\n".join(
                     f"The result of tool '{tool.name}' with parameters '{tool.args}' was: {tool.result}"
                     for tool in tool_entries

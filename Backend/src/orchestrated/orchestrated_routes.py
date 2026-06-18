@@ -524,11 +524,7 @@ Please address these specific improvements:
         await self.send_to_websocket(StatusMessage(agent=agent, status=message, chat_id=self.chat.chat_id))
 
     async def invoke_tools(self, agent: WorkerAgent, task_str: str, message: AgentMessage) -> AgentResult:
-        tasks = []
-        for tool in message.tools:
-            tasks.append(self.invoke_tool(tool))
-                
-        tool_results = await asyncio.gather(*tasks)
+        tool_results = await self.invoke_all_tools(message)
         message.tools = tool_results        
         tool_output = "\n".join(
             f"- Worker Agent Executed: {tool.name}."

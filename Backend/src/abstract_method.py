@@ -246,6 +246,9 @@ class AbstractMethod(ABC):
         if self.session.has_websocket() and self.streaming:
             await self.session.websocket_send(message)
 
+    async def invoke_all_tools(self, response: AgentMessage) -> List[ToolCall]:
+        tasks = [self.invoke_tool(tool) for tool in response.tools]
+        return await asyncio.gather(*tasks)
 
     async def invoke_tool(self, tool: ToolCall, login_attempt_retry: bool = False) -> ToolCall:
         """
