@@ -24,7 +24,7 @@ from openai import OpenAI
 from . import sample_prompts as prompts
 from .models import ConnectRequest, ToolApprovalUpdateRequest, QueryRequest, QueryResponse, ConfigPayload, Chat, RestrictedActions, \
     SearchResult, get_supported_models, SessionData, OpacaException, MCPCreateRequest, PushMessage, \
-    InvokeRequest, InvokeResponse, SessionPrompts, ReloadChatsMessage, OpacaFile
+    InvokeRequest, InvokeResponse, SessionPrompts, ReloadChatsMessage, OpacaFile, PromptMacro, default_prompt_macros
 from .simple import SimpleMethod
 from .simple_tools import SimpleToolsMethod
 from .toolllm import ToolLLMMethod
@@ -553,6 +553,28 @@ async def post_default_prompts(data: SessionPrompts, auth = Depends(require_pass
 @app.delete("/prompts/default", description="Reset default Sample Prompts for new sessions", tags=["sample prompts", "admin"])
 async def reset_default_prompts(auth = Depends(require_password)) -> None:
     prompts.reset_default_prompts()
+
+
+# prompt macros
+
+@app.get("/prompt-macros", description="Get user-defined prompt macros for the current session.", tags=["prompt macros"])
+async def get_prompt_macros(session: SessionData = Depends(handle_session_http)) -> List[PromptMacro]:
+    session.ensure_default_prompt_macros()
+    return session.prompt_macros
+
+
+@app.post("/prompt-macros", description="Save user-defined prompt macros for the current session.", tags=["prompt macros"])
+async def post_prompt_macros(data: List[PromptMacro], session: SessionData = Depends(handle_session_http)) -> None:
+    macro_ids = [macro.id for macro in data]
+    if len(macro_ids) != len(set(macro_ids)):
+        raise ValueError("Prompt macro IDs must be unique.")
+    session.prompt_macros = data
+    session.ensure_default_prompt_macros()
+
+
+@app.delete("/prompt-macros", description="Reset prompt macros for the current session.", tags=["prompt macros"])
+async def reset_prompt_macros(session: SessionData = Depends(handle_session_http)) -> None:
+    session.prompt_macros = default_prompt_macros()
 
 
 # WHISPER TTS/STT

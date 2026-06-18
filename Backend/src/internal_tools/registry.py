@@ -19,6 +19,7 @@ from .context import InternalToolContext
 from .chats import ChatTools
 from .code_tools import CodeTools
 from .files import FileTools
+from .prompt_macros import PromptMacroTools
 from .scheduling import ScheduledTaskTools
 
 if TYPE_CHECKING:
@@ -29,6 +30,7 @@ INTERNAL_TOOLS_AGENT_NAME = "LLM-Assistant"
 
 
 TOOL_GROUPS = (
+    PromptMacroTools,
     ScheduledTaskTools,
     ChatTools,
     FileTools,
