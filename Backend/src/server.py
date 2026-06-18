@@ -270,7 +270,7 @@ async def query_no_history(method: str, message: QueryRequest, session: SessionD
 
 @app.get("/mcp", description="Get a list of all added MCP servers and their actions", tags=["mcp"])
 async def get_mcp_list(session: SessionData = Depends(handle_session_http)) -> Dict:
-    return await session.get_mcp_tools()
+    return session.get_mcp_tools()
 
 
 @app.post("/mcp", description="Add a new MCP server to the list of available MCP servers", tags=["mcp"])

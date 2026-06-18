@@ -492,7 +492,7 @@ class SessionData(BaseModel):
         else:
             raise Exception("Websocket not connected")
 
-    async def get_mcp_tools(self) -> dict[str, list[MCPTool]]:
+    def get_mcp_tools(self) -> dict[str, list[MCPTool]]:
         """Returns a list of all available mcp server tools."""
         return {
             server.params.server_label: list(server.tools.values())

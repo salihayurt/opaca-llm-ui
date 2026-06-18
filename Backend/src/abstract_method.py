@@ -329,7 +329,7 @@ class AbstractMethod(ABC):
                 tool.cast_to_openai_tool()
                 for server in self.session.mcp_servers.values()
                 for tool in server.tools.values()
-                if tool.approval != ToolApprovalState.DENY  # XXX
+                if tool.approval != ToolApprovalState.DENY
                 and not any(x.lower() in tool.name.lower() for x in actions_blacklist)
             ]
             tools.extend(mcp_tools)
