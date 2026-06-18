@@ -142,6 +142,10 @@ export default {
     color: var(--text-primary-color);
 }
 
+.app-accordion--nested {
+    padding-left: 0.75rem;
+}
+
 .app-accordion--nested .accordion-item {
     border: none;
     border-radius: 0;
