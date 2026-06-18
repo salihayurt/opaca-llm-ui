@@ -85,6 +85,63 @@ export default {
 </script>
 
 <style scoped>
+.accordion-item {
+    border-radius: var(--bs-border-radius);
+    margin-bottom: 0.5rem;
+    border: 1px solid var(--border-color);
+    overflow: hidden;
+    background-color: var(--surface-color);
+}
+
+.accordion-button {
+    border-radius: var(--bs-border-radius);
+    padding: 1rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    background-color: var(--background-color);
+    color: var(--text-primary-color);
+    border: 1px solid var(--border-color);
+}
+
+.accordion-button :deep(i) {
+    margin-right: 0.75rem;
+}
+
+.accordion-button:not(.collapsed) {
+    color: var(--button-primary-color);
+    background-color: var(--primary-color);
+    box-shadow: none;
+}
+
+.accordion-button:hover {
+    color: var(--button-primary-color);
+    background-color: var(--secondary-color)
+}
+
+.accordion-button:focus {
+    box-shadow: none;
+    border-color: transparent;
+}
+
+.accordion-button::after {
+    background-size: 1rem;
+    width: 1rem;
+    height: 1rem;
+    transition: all 0.2s ease;
+    filter: invert(var(--icon-invert-color));
+}
+
+.accordion-body {
+    padding: 0;
+    background-color: var(--background-color);
+    color: var(--text-primary-color);
+}
+
+.accordion-collapse {
+    background-color: var(--background-color);
+    color: var(--text-primary-color);
+}
+
 .app-accordion--nested .accordion-item {
     border: none;
     border-radius: 0;
