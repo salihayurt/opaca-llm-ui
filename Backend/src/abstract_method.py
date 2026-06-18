@@ -19,7 +19,7 @@ from litellm.types.llms.openai import ResponsesAPIStreamEvents as event_type
 from mcp.types import CallToolRequestParams
 
 from .models import (ToolApprovalState, SessionData, QueryResponse, AgentMessage, ChatMessage, OpacaException, Chat,
-                     ToolCall, ContainerLoginNotification, ContainerLoginResponse, ToolCallMessage,
+                     ToolCall, ToolType, ContainerLoginNotification, ContainerLoginResponse, ToolCallMessage,
                      ToolResultMessage, TextChunkMessage, MetricsMessage, StatusMessage, MethodConfig,
                      MissingApiKeyNotification, MissingApiKeyResponse, ConfirmActionNotification, ConfirmActionResponse,
                      LLMConfig)
@@ -68,7 +68,7 @@ class AbstractMethod(ABC):
         return f"{agent_message.id}/{next(self.tool_counter)}"
 
     def _resolve_tool_approval(self, tool: ToolCall) -> ToolApprovalState:
-        if tool.type == "mcp":
+        if tool.type == ToolType.MCP:
             server_label, tool_name = tool.name.split('--', maxsplit=1)
             user_approval = self.session.get_mcp_tool(server_label, tool_name).approval
         else:
@@ -214,8 +214,7 @@ class AbstractMethod(ABC):
                             logger.warning("Received tool call without a name, skipping.")
                             continue
 
-                        # Determine tool type and name based on presence of server label and matching MCP server/tools
-                        tool_type = "mcp" if any(t.name in mcp_server.tools for mcp_server in self.session.mcp_servers.values()) else "opaca"
+                        tool_type = self.determine_tool_type(t.name)
 
                         try:
                             tool = ToolCall(name=t.name, type=tool_type, id=self.next_tool_id(agent_message), args=json.loads(t.arguments))
@@ -241,6 +240,15 @@ class AbstractMethod(ABC):
 
         return agent_message
 
+    def determine_tool_type(self, tool_name: str) -> ToolType:
+        """Determine tool type and name based on presence of server label and matching MCP server/tools"""
+        provider = tool_name.split('--')[0]
+        if provider == INTERNAL_TOOLS_AGENT_NAME:
+            return ToolType.INTERNAL
+        elif provider in self.session.mcp_servers:
+            return ToolType.MCP
+        else:
+            return ToolType.OPACA
 
     async def send_to_websocket(self, message: BaseModel):
         if self.session.has_websocket() and self.streaming:
@@ -271,14 +279,15 @@ class AbstractMethod(ABC):
             if approval_state == ToolApprovalState.ASK and not await self.check_confirmation(tool.name, tool.args):
                 return await create_result("Execution declined by user, do not attempt again.")
 
+        # tools are always formatted the same; provider can be MCP server or OPACA agent
+        provider, tool_name = tool.name.split('--', maxsplit=1)
+
         # MCP Tool Execution Flow
-        if tool.type == "mcp":
-            server_label, tool_name = tool.name.split('--', maxsplit=1)
-            server = self.session.mcp_servers.get(server_label)
+        if tool.type == ToolType.MCP:
+            server = self.session.mcp_servers.get(provider)
             try:
                 client = MCPClient(server_url=server.server_url)
                 res = await client.call_tool(CallToolRequestParams(name=tool_name, arguments=tool.args))
-                
                 if res.isError:
                     t_result = f"Execution failed. Error: {res.content}"
                 else:
@@ -286,21 +295,24 @@ class AbstractMethod(ABC):
             except Exception as e:
                 t_result = f"Failed to invoke MCP tool.\nCause: {e}"
 
-        # OPACA and Internal Tool Execution Flow
-        else:
-            agent_name, action_name = tool.name.split('--', maxsplit=1)
+        # Internal Tool Execution Flow
+        elif tool.type == ToolType.INTERNAL:
             try:
-                if agent_name == INTERNAL_TOOLS_AGENT_NAME:
-                    t_result = await self.internal_tools.call_internal_tool(action_name, tool.args)
-                else:
-                    t_result = await self.session.opaca_client.safe_invoke(action_name, agent_name, tool.args)
+                t_result = await self.internal_tools.call_internal_tool(tool_name, tool.args)
+            except Exception as e:
+                t_result = f"Failed to invoke Internal tool.\nCause: {e}"
+
+        # OPACA Tool Execution Flow
+        else:
+            try:
+                t_result = await self.session.opaca_client.safe_invoke(tool_name, provider, tool.args)
             except httpx.HTTPStatusError as e:
                 res = e.response.json()
-                t_result = f"Failed to invoke tool.\nStatus code: {e.response.status_code}\nResponse: {e.response.text}\nResponse JSON: {res}"
+                t_result = f"Failed to invoke OPACA tool.\nStatus code: {e.response.status_code}\nResponse: {e.response.text}\nResponse JSON: {res}"
                 cause = res.get("cause", {}).get("message", "")
                 status = res.get("cause", {}).get("statusCode", -1)
                 if self.session.has_websocket() and (status in [401, 403] or ("401" in cause or "403" in cause or "credentials" in cause)):
-                    return await self.handle_container_login(agent_name, action_name, tool, login_attempt_retry)
+                    return await self.handle_container_login(provider, tool_name, tool, login_attempt_retry)
             except Exception as e:
                 t_result = f"Failed to invoke OPACA tool.\nCause: {e}"
 

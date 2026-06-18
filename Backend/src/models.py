@@ -226,9 +226,15 @@ class ChatMessage(BaseModel):
     content: str | List[Dict[str, Any]]
 
 
+class ToolType(Enum):
+    OPACA = "opaca"
+    MCP = "mcp"
+    INTERNAL = "internal"
+
+
 class ToolCall(BaseModel):
     id: str
-    type: Literal["opaca", "mcp"]
+    type: ToolType
     name: str
     args: Dict[str, Any] = {}
     result: Any | None = None
