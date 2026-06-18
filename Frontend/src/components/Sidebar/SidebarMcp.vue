@@ -119,9 +119,6 @@ import { getEffectiveApproval, isConfirmationTool, isForbiddenTool } from '../..
 export default {
     name: 'SidebarMcp',
     components: {InputDialogue},
-    props: {
-        isPlatformConnected: Boolean,
-    },
     setup() {
         const { isMobile } = useDevice();
         return { Localizer, isMobile };
@@ -135,14 +132,9 @@ export default {
         };
     },
     methods: {
-        async updateMcp(isPlatformConnected) {
+        async updateMcp() {
             this.isLoading = true;
             try {
-                if (!isPlatformConnected) {
-                    this.platformMcp = null;
-                    this.restrictedActions = { forbidden: [], need_confirmation: [] };
-                    return;
-                }
                 this.restrictedActions = await backendClient.getRestrictedActions();
                 this.platformMcp = await backendClient.getMCPs();
             } finally {
@@ -268,10 +260,9 @@ export default {
             return "Unknown error encountered!"
         }
     },
-    watch: {
-        isPlatformConnected() {
-            this.updateMcp(this.isPlatformConnected);
-        }
+
+    mounted() {
+        this.updateMcp();
     }
 }
 </script>

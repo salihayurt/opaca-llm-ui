@@ -139,7 +139,6 @@
                 <!-- MCP servers -->
                 <SidebarMcp
                     v-show="SidebarManager.isViewSelected('mcp')"
-                    :is-platform-connected="connected"
                     ref="mcp"
                 />
 
