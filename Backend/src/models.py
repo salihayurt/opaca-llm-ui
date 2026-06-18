@@ -355,16 +355,10 @@ class MCPTool(BaseModel):
         }
 
 
-class MCPServerParams(BaseModel):
-    # TODO this class is virtually identical with MCPCreateRequest -> reuse or inline into MCPServer?
-    server_url: str
-    server_label: str
-    type: str | None = None
-    require_approval: str
-
-
 class MCPServer(BaseModel):
-    params: MCPServerParams
+    server_url: str
+    server_label: str | None = None
+    type: str | None = None
     tools: Dict[str, MCPTool] = Field(default_factory=dict)
     
 
@@ -495,7 +489,7 @@ class SessionData(BaseModel):
     def get_mcp_tools(self) -> dict[str, list[MCPTool]]:
         """Returns a list of all available mcp server tools."""
         return {
-            server.params.server_label: list(server.tools.values())
+            server.server_label: list(server.tools.values())
             for server in self.mcp_servers.values()
         }
 
@@ -532,7 +526,7 @@ class SessionData(BaseModel):
             raise OpacaException("The 'server_url' needs to be in a valid url-format (e.g. 'http://<address>.com/mcp')", "Malformed 'server_url'!", 400)
 
         # Check if a previous mcp server with the same url already exists
-        if any(m.params.server_url == req.server_url for m in self.mcp_servers.values()):
+        if any(m.server_url == req.server_url for m in self.mcp_servers.values()):
             raise OpacaException(f"An MCP server with the given server_url '{req.server_url}' already exists!", "Duplicate 'server_url'!", 400)
 
         # If no server label was given, transform the server_url into the label
@@ -549,28 +543,20 @@ class SessionData(BaseModel):
         if not client_tools:
             raise OpacaException(f"The given server_url '{req.server_url}' provides no mcp tools and cannot be added!", "Unreachable MCP server!", 400)
 
-        mcp_params = MCPServerParams(
-            server_url=req.server_url,
-            server_label=req.server_label,
-            type=req.type,
-            # Disable auto-execution of MCP tools by LiteLLM: Force it to always require approval
-            # Our backend manages the permission flow itself with UI integration
-            require_approval="always"
-        )
-
-        mcp_tools = {}
-        for tool in client_tools:
-            full_name = f"{req.server_label}--{tool.name}"
-            mcp_tools[full_name] = MCPTool(
+        mcp_tools = {
+            f"{req.server_label}--{tool.name}": MCPTool(
                 name=tool.name,
-                description=tool.description if tool.description else '',
+                description=tool.description or '',
                 inputSchema=tool.inputSchema,
                 server_label=req.server_label,
                 approval=req.default_approval
             )
-
+            for tool in client_tools
+        }
         self.mcp_servers[req.server_label] = MCPServer(
-            params=mcp_params,
+            server_url=req.server_url,
+            server_label=req.server_label,
+            type=req.type,
             tools=mcp_tools
         )
         return True

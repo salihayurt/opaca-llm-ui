@@ -276,7 +276,7 @@ class AbstractMethod(ABC):
             server_label, tool_name = tool.name.split('--', maxsplit=1)
             server = self.session.mcp_servers.get(server_label)
             try:
-                client = MCPClient(server_url=server.params.server_url)
+                client = MCPClient(server_url=server.server_url)
                 res = await client.call_tool(CallToolRequestParams(name=tool_name, arguments=tool.args))
                 
                 if res.isError:
