@@ -356,6 +356,7 @@ class MCPTool(BaseModel):
 
 
 class MCPServerParams(BaseModel):
+    # TODO this class is virtually identical with MCPCreateRequest -> reuse or inline into MCPServer?
     server_url: str
     server_label: str
     type: str | None = None
@@ -493,22 +494,22 @@ class SessionData(BaseModel):
 
     async def get_mcp_tools(self) -> dict[str, list[MCPTool]]:
         """Returns a list of all available mcp server tools."""
-        tools = {}
-        for server in self.mcp_servers.values():
-            tools[server.params.server_label] = list(server.tools.values())
-        return tools
+        return {
+            server.params.server_label: list(server.tools.values())
+            for server in self.mcp_servers.values()
+        }
 
-    async def set_mcp_tool_approval(self, server_label: str, tool_name: str, approval: ToolApprovalState):
-        """Set whether a tool call should be allowed, denied, or require confirmation by the user."""
-        server = self.mcp_servers.get(server_label)
-        if not server:
-            raise KeyError(f"MCP server with label '{server_label}' not found.")
-        
+    def get_mcp_tool(self, server_label: str, tool_name: str) -> MCPTool:
         full_name = f"{server_label}--{tool_name}"
-        tool = server.tools.get(full_name)
-        if not tool:
+        if not (server := self.mcp_servers.get(server_label)):
+            raise KeyError(f"MCP server with label '{server_label}' not found.")
+        if not (tool := server.tools.get(full_name)):
             raise KeyError(f"Tool '{full_name}' not found in MCP server '{server_label}'.")
-        
+        return tool
+    
+    def set_mcp_tool_approval(self, server_label: str, tool_name: str, approval: ToolApprovalState):
+        """Set whether a tool call should be allowed, denied, or require confirmation by the user."""
+        tool = self.get_mcp_tool(server_label, tool_name)
         tool.approval = approval
 
     def get_opaca_tool_approval(self, tool_name: str) -> ToolApprovalState:
@@ -522,7 +523,6 @@ class SessionData(BaseModel):
         if container_id not in self.opaca_approvals:
             self.opaca_approvals[container_id] = {}
         self.opaca_approvals[container_id][tool_name] = approval
-
 
     async def add_mcp_server(self, req: MCPCreateRequest) -> bool:
         """Adds a new mcp server json"""
