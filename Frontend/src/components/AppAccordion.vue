@@ -143,7 +143,7 @@ export default {
 }
 
 .app-accordion--nested {
-    padding-left: 0.75rem;
+    padding: 0.4rem 0 0.4rem 0.4rem;
 }
 
 .app-accordion--nested .accordion-item {
