@@ -226,7 +226,7 @@ class ChatMessage(BaseModel):
     content: str | List[Dict[str, Any]]
 
 
-class ToolType(Enum):
+class ToolType(str, Enum):
     OPACA = "opaca"
     MCP = "mcp"
     INTERNAL = "internal"
