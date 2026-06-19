@@ -25,9 +25,7 @@ if TYPE_CHECKING:
     from ..abstract_method import AbstractMethod
 
 
-INTERNAL_TOOLS_AGENT_NAME = "LLM-Assistant"
-
-
+ToolGroup = ScheduledTaskTools | ChatTools | FileTools | CodeTools
 TOOL_GROUPS = (
     ScheduledTaskTools,
     ChatTools,
@@ -48,9 +46,7 @@ class InternalTools:
         )
         self.groups = [group_cls(self.context) for group_cls in TOOL_GROUPS]
 
-    def available_tools(self) -> list[InternalTool]:
-        return [tool for group in self.groups for tool in group.tools()]
-
+    # FORMAT INTERNAL TOOLS FOR DIFFERENT OCCASIONS
 
     def _format_internal_tool_simple(self, tool: InternalTool) -> dict:
         return {
@@ -65,30 +61,26 @@ class InternalTools:
             },
             "result": {"type": tool.result, "required": True},
         }
+    
+    def _format_internal_tool_group_simple(self, group: ToolGroup) -> list[dict]:
+        return [self._format_internal_tool_simple(tool) for tool in group.tools()]
 
     def get_internal_tools_simple(self) -> dict[str, list[dict]]:
-        """return internal tools in OPACA format used by simple agent"""
+        """return internal tools in simplified OPACA format used by simple agent"""
         return {
-            INTERNAL_TOOLS_AGENT_NAME: [
-                self._format_internal_tool_simple(tool)
-                for tool in self.available_tools()
-            ]
+            group.GROUP_NAME: self._format_internal_tool_group_simple(group)
+            for group in self.groups if group.tools()
         }
 
     def get_internal_tools_containers(self) -> list[dict]:
         """return internal tools as a pseudo OPACA container for UI display"""
-        agents = []
-        for group in self.groups:
-            actions = [
-                self._format_internal_tool_simple(tool)
-                for tool in group.tools()
-            ]
-            if actions:
-                agents.append({
-                    "agentId": group.GROUP_NAME,
-                    "actions": actions,
-                })
-
+        agents = [
+            {
+                "agentId": group.GROUP_NAME,
+                "actions": self._format_internal_tool_group_simple(group),
+            }
+            for group in self.groups if group.tools()
+        ]
         return [{
             "containerId": "__internal_tools__",
             "image": {
@@ -105,7 +97,7 @@ class InternalTools:
         return [
             {
                 "type": "function",
-                "name": INTERNAL_TOOLS_AGENT_NAME + "--" + tool.name,
+                "name": group.GROUP_NAME + "--" + tool.name,
                 "description": tool.description,
                 "parameters": {
                     "type": "object",
@@ -117,12 +109,18 @@ class InternalTools:
                     "required": tool.required_params if tool.required_params is not None else list(tool.params),
                 },
             }
-            for tool in self.available_tools()
+            for group in self.groups
+            for tool in group.tools()
         ]
+
+    # EXECUTING INTERNAL TOOLS, delegating to the respective tool group
+
+    def is_internal_tool(self, provider: str) -> bool:
+        return any(group.GROUP_NAME == provider for group in self.groups)
 
     async def call_internal_tool(self, tool: str, parameters: dict):
         """get callback method for internal tool matching the name and call with given parameters"""
-        tool_def = next((t for t in self.available_tools() if t.name == tool), None)
+        tool_def = next((t for g in self.groups for t in g.tools() if t.name == tool), None)
         if tool_def is None:
             raise ValueError(f"Internal tool '{tool}' is not available")
         return await tool_def.function(**parameters)

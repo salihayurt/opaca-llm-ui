@@ -24,7 +24,7 @@ from .models import (ToolApprovalState, SessionData, QueryResponse, AgentMessage
                      MissingApiKeyNotification, MissingApiKeyResponse, ConfirmActionNotification, ConfirmActionResponse,
                      LLMConfig)
 from .file_utils import upload_files
-from .internal_tools import InternalTools, INTERNAL_TOOLS_AGENT_NAME
+from .internal_tools import InternalTools
 from .opaca_client import actions_blacklist
 
 
@@ -243,7 +243,7 @@ class AbstractMethod(ABC):
     def determine_tool_type(self, tool_name: str) -> ToolType:
         """Determine tool type and name based on presence of server label and matching MCP server/tools"""
         provider = tool_name.split('--')[0]
-        if provider == INTERNAL_TOOLS_AGENT_NAME:
+        if self.internal_tools and self.internal_tools.is_internal_tool(provider):
             return ToolType.INTERNAL
         elif provider in self.session.mcp_servers:
             return ToolType.MCP
