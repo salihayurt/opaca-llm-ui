@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 
-from ..code_execution import PYODIDE_CODE_PROMPT, PYODIDE_CODE_RETRY_PROMPT, extract_code_block
+from ..code_execution import PYODIDE_CODE_PROMPT, PYODIDE_CODE_RETRY_PROMPT, CodeExecutor, extract_code_block
 from ..models import InternalTool
 from .context import InternalToolContext
 
@@ -17,6 +17,7 @@ class CodeTools:
         self.ctx = ctx
 
     def tools(self) -> list[InternalTool]:
+        if not CodeExecutor.available: return []
         return [
             InternalTool(
                 name="ExecuteCode",
@@ -25,7 +26,6 @@ class CodeTools:
                 required_params=["code"],
                 result="object",
                 function=self.ctx.code_executor.execute_code,
-                requires_code_execution=True,
             ),
             InternalTool(
                 name="SolveWithCode",
@@ -34,7 +34,6 @@ class CodeTools:
                 required_params=["task"],
                 result="object",
                 function=self.tool_solve_with_code,
-                requires_code_execution=True,
             ),
         ]
 

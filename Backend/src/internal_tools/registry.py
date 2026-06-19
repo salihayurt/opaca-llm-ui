@@ -47,17 +47,10 @@ class InternalTools:
             code_executor=self.code_executor,
         )
         self.groups = [group_cls(self.context) for group_cls in TOOL_GROUPS]
-        self.group_tools = [(group, group.tools()) for group in self.groups]
-        self.tools = [tool for _, tools in self.group_tools for tool in tools]
-
-    def _get_group(self, group_type):
-        return next(group for group in self.groups if isinstance(group, group_type))
 
     def available_tools(self) -> list[InternalTool]:
-        return [tool for tool in self.tools if self._is_tool_available(tool)]
+        return [tool for group in self.groups for tool in group.tools()]
 
-    def _is_tool_available(self, tool: InternalTool) -> bool:
-        return CodeExecutor.available is True or not tool.requires_code_execution
 
     def _format_internal_tool_simple(self, tool: InternalTool) -> dict:
         return {
@@ -85,11 +78,10 @@ class InternalTools:
     def get_internal_tools_containers(self) -> list[dict]:
         """return internal tools as a pseudo OPACA container for UI display"""
         agents = []
-        for group, tools in self.group_tools:
+        for group in self.groups:
             actions = [
                 self._format_internal_tool_simple(tool)
-                for tool in tools
-                if self._is_tool_available(tool)
+                for tool in group.tools()
             ]
             if actions:
                 agents.append({
@@ -137,4 +129,5 @@ class InternalTools:
 
     async def resume_scheduled_task(self, task: ScheduledTask):
         """resume scheduled task after deserialization"""
-        return await self._get_group(ScheduledTaskTools).resume_scheduled_task(task)
+        task_scheduler = next(group for group in self.groups if isinstance(group, ScheduledTaskTools))
+        return await task_scheduler.resume_scheduled_task(task)

@@ -251,7 +251,6 @@ class InternalTool(BaseModel):
     required_params: list[str] | None = None
     result: str
     function: Callable
-    requires_code_execution: bool = False
 
 
 class ScheduledTask(BaseModel):
