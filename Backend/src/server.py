@@ -616,16 +616,7 @@ def verify_token(token: str):
     header = jwt.get_unverified_header(token)
 
     # Find matching key to decode token
-    rsa_key = {}
-    for key in jwks["keys"]:
-        if key["kid"] == header["kid"]:
-            rsa_key = {
-                "kty": key["kty"],
-                "kid": key["kid"],
-                "use": key["use"],
-                "n": key["n"],
-                "e": key["e"],
-            }
+    rsa_key = {k: key[k] for k in ["kty", "kid", "use", "n", "e"] for key in jwks["keys"] if key["kid"] == header["kid"]}
     if not rsa_key:
         raise HTTPException(401, "No matching keys were found")
 

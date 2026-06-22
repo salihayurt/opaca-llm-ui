@@ -392,7 +392,7 @@ class SessionData(BaseModel):
     the server is using the same method for waiting for the webserver to be closed again.
     """
     session_id: str = Field(default_factory=lambda: str(uuid.uuid4()), alias='_id')
-    user_id: str = ""
+    user_id: str = Field()
     chats: Dict[str, Chat] = Field(default_factory=dict)
     config: Dict[str, Any] = Field(default_factory=dict)
     uploaded_files: Dict[str, OpacaFile] = Field(default_factory=dict)
@@ -433,8 +433,6 @@ class SessionData(BaseModel):
     def clone_model(self) -> "SessionData":
         """Clone the current model and return a new instance. Intended to create user sessions."""
         new = SessionData(**self.model_dump(exclude={"session_id"}))
-        # Set "valid_until" to year 2100 to avoid deletion of the user session
-        new.valid_until = datetime(2100, 1, 1).timestamp()
         new._websocket = self._websocket
         new._ws_msg_queue = self._ws_msg_queue
         new._ws_out_cache = self._ws_out_cache

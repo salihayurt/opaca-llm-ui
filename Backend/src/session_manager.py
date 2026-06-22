@@ -160,6 +160,8 @@ async def get_user_session(user_id: str, session_id: str, methods: dict[str, typ
         session = old_session.clone_model()
         # Set the user id for the new session
         session.user_id = user_id
+        # Set "valid_until" to year 2100 to avoid deletion of the user session
+        session.valid_until = datetime(2100, 1, 1).timestamp()
         # Save the session in the sessions
         sessions[session.session_id] = session
 
