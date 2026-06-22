@@ -616,7 +616,7 @@ def verify_token(token: str):
     header = jwt.get_unverified_header(token)
 
     # Find matching key to decode token
-    rsa_key = {k: key[k] for k in ["kty", "kid", "use", "n", "e"] for key in jwks["keys"] if key["kid"] == header["kid"]}
+    rsa_key = {k: key[k] for key in jwks["keys"] if key["kid"] == header["kid"] for k in ["kty", "kid", "use", "n", "e"]}
     if not rsa_key:
         raise HTTPException(401, "No matching keys were found")
 
@@ -636,6 +636,7 @@ async def handle_session_id(source: Union[Request, WebSocket], response: Optiona
     """
     Unified session handler for both HTTP requests and WebSocket connections.
     If no valid session ID is found, a new one is created and optionally set in the response cookie.
+    If an Authentication header is provided and valid, will load the associated user session.
     """
 
     # Extract cookies from headers
@@ -652,7 +653,7 @@ async def handle_session_id(source: Union[Request, WebSocket], response: Optiona
         session_id = cookie_dict.get("session_id", None)
 
     # Check if Authorization is present in header
-    if session_id and (auth_header := source.headers.get("authorization")):
+    if auth_header := source.headers.get("authorization"):
 
         # Check if the token has the correct format
         try:
