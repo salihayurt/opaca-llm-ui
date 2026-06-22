@@ -107,7 +107,7 @@ def require_password(x_api_password: str | None = Header(None)):
 @lru_cache
 def get_jwks():
     # Request the JWKS from the auth0 tenant
-    return requests.get(f"https://{os.getenv('VITE_AUTH0_DOMAIN')}/.well-known/jwks.json").json()
+    return requests.get(f"https://{os.getenv('VITE_AUTH_DOMAIN')}/.well-known/jwks.json").json()
 
 
 # SESSION HANDLING
@@ -625,8 +625,8 @@ def verify_token(token: str):
         token,
         rsa_key,
         algorithms=["RS256"],
-        audience=os.getenv("VITE_AUTH0_AUDIENCE"),
-        issuer=f"https://{os.getenv('VITE_AUTH0_DOMAIN')}/",
+        audience=os.getenv("VITE_AUTH_AUDIENCE"),
+        issuer=f"https://{os.getenv('VITE_AUTH_DOMAIN')}/",
     )
 
     return payload

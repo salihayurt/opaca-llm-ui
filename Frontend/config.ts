@@ -29,6 +29,10 @@ interface Config {
     language: string;
     audioMethod: string;
     registryUrl: string | null;
+    authEnabled: boolean;
+    authDomain: string;
+    authClientId: string;
+    authAudience: string;
 };
 
 const baseConfig: Config = {
@@ -72,6 +76,18 @@ const baseConfig: Config = {
 
     // OPACA container registry
     registryUrl: getMaybeStringOrDefault("registryUrl", null),
+
+    // Auth0 user management
+    authEnabled: getBoolOrDefault("authEnabled", false),
+
+    // Auth0 Domain
+    authDomain: getStringOrDefault("authDomain", ""),
+
+    // Auth0 Client Id
+    authClientId: getStringOrDefault("authClientId", ""),
+
+    // Auth0 Audience
+    authAudience: getStringOrDefault("authAudience", ""),
 }
 
 function getStringOrDefault(key: string, defaultValue: string): string {

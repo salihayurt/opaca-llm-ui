@@ -147,14 +147,14 @@ import Notifications from './components/Notifications.vue';
 import OptionsSelect from "./components/OptionsSelect.vue";
 import CookieBanner from './components/CookieBanner.vue';
 import InputDialogue from './components/InputDialogue.vue';
-import {useAuth0} from "@auth0/auth0-vue";
+import { useAuthentication } from "./useAuthentication.ts";
 
 export default {
     name: 'App',
     components: {OptionsSelect, MainContent, CookieBanner, Notifications, InputDialogue},
     setup() {
         const { isMobile } = useDevice();
-        const { getAccessTokenSilently, isAuthenticated } = useAuth0();
+        const { getAccessTokenSilently, isAuthenticated } = useAuthentication();
         backendClient.init({
             getTokenFn: getAccessTokenSilently,
             isAuthenticated: isAuthenticated

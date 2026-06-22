@@ -204,7 +204,7 @@
 import conf from '../../../config.js'
 import { useDevice } from "../../useIsMobile.js";
 import SidebarManager from "../../SidebarManager.js";
-import { useAuth0 } from "@auth0/auth0-vue";
+import { useAuthentication } from "../../useAuthentication.ts";
 import Localizer from "../../Localizer.js";
 import SidebarQuestions from './SidebarQuestions.vue';
 import SidebarAgents from "./SidebarAgents.vue";
@@ -251,8 +251,8 @@ export default {
     ],
     setup() {
         const { isMobile } = useDevice();
-        const { loginWithPopup, isLoading, logout, user, isAuthenticated } = useAuth0();
-        return { SidebarManager, Localizer, isMobile, loginWithPopup, isLoading, logout, user, isAuthenticated };
+        const { loginWithPopup, logout, user, isAuthenticated } = useAuthentication();
+        return { SidebarManager, Localizer, isMobile, loginWithPopup, logout, user, isAuthenticated };
     },
     data() {
         return {

@@ -9,6 +9,7 @@ import {createAuth0} from "@auth0/auth0-vue"
 
 import './style.css'
 import App from './App.vue'
+import conf from '../config.js';
 
 const app = createApp(App)
 
@@ -18,15 +19,17 @@ app.use(PrimeVue, {
     },
 })
 
-app.use(createAuth0({
-    domain: import.meta.env.VITE_AUTH0_DOMAIN,
-    clientId: import.meta.env.VITE_AUTH0_CLIENT_ID,
-    authorizationParams: {
-        redirect_uri: window.location.origin,
-        audience: import.meta.env.VITE_AUTH0_AUDIENCE,
-    },
-    cacheLocation: "localstorage",
-    useRefreshTokens: true,
-}))
+if (conf.authEnabled) {
+    app.use(createAuth0({
+        domain: conf.authDomain,
+        clientId: conf.authClientId,
+        authorizationParams: {
+            redirect_uri: window.location.origin,
+            audience: conf.authAudience,
+        },
+        cacheLocation: "localstorage",
+        useRefreshTokens: true,
+    }))
+}
 
 app.mount('#app')
