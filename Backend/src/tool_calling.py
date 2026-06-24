@@ -40,7 +40,7 @@ class ToolCaller:
             return ToolType.OPACA
 
 
-    async def invoke_tool(self, tool: ToolCall, login_attempt_retry: bool = False) -> ToolCall:
+    async def invoke_tool(self, tool: ToolCall, login_attempt_retry: bool = False, skip_approval: bool = False) -> ToolCall:
         """
         Invoke tool (OPACA or MCP) matching the given ToolCall. 
         If OPACA invoke fails due to required login, attempt Login (via websocket callback) and try again.
@@ -51,7 +51,7 @@ class ToolCaller:
             return ToolCall(id=tool.id, type=tool.type, name=tool.name, args=tool.args, result=result)
 
         # If login_attempt_retry=True, the user has already been asked and allowed tool execution
-        if not login_attempt_retry:
+        if not (login_attempt_retry or skip_approval):
             approval_state = self.resolve_tool_approval(tool)
 
             if approval_state == ToolApprovalState.DENY:
