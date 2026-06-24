@@ -76,7 +76,7 @@
 
                             <template #body="{ item: action, index: actionIndex }">
                                 <div class="action-body p-2">
-                                    <p v-if="!isInternalContainer(containerId)" class="invoke" @click.stop="invokeAction(agentId, action.name, action.parameters)">
+                                    <p class="invoke" @click.stop="invokeAction(agentId, action.name, action.parameters)">
                                         <strong>{{ Localizer.get('agents_invoke') }}</strong>
                                         <i class="fa fa-circle-play mx-2"/>
                                     </p>
