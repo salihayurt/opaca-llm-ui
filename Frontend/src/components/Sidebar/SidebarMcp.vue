@@ -12,89 +12,79 @@
         {{ Localizer.get('mcp_missing') }}
     </div>
     <div v-else class="flex-row" >
-        <div class="accordion text-start" id="mcp-accordion">
-            <div v-for="(mcpContent, mcpName, mcpServerIndex) in this.getMcp()" class="accordion-item" :key="mcpServerIndex">
+        <AppAccordion
+            id="mcp-accordion"
+            class="text-start"
+            :items="getMcpServers()"
+            :get-key="server => server.name"
+        >
+            <template #header="{ item: server }">
+                <i class="fa fa-server me-3"/>
+                <strong>{{ server.name }}</strong>
 
-                <!-- header -->
-                <h2 class="accordion-header m-0" :id="'mcp-header-' + mcpServerIndex">
-                    <button class="accordion-button collapsed"
-                            type="button" data-bs-toggle="collapse"
-                            :data-bs-target="'#mcp-body-' + mcpServerIndex"
-                            aria-expanded="false"
-                            :aria-controls="'mcp-body-' + mcpServerIndex">
-                        <i class="fa fa-server me-3"/>
-                        <strong>{{ mcpName }}</strong>
+                <!-- Delete Button -->
+                <i
+                    class="fa fa-remove delete-icon"
+                    @click.stop="this.deleteMcp(server.name)"
+                    :title="Localizer.get('mcp_remove')"
+                />
+            </template>
 
-                        <!-- Delete Button -->
-                        <i
-                            class="fa fa-remove delete-icon"
-                            @click.stop="this.deleteMcp(mcpName)"
-                            :title="Localizer.get('mcp_remove')"
-                        />
-                    </button>
-                </h2>
+            <template #body="{ item: server, index: mcpServerIndex }">
+                <AppAccordion
+                    :id="`mcp-accordion-${mcpServerIndex}`"
+                    :items="server.tools"
+                    :get-key="mcp => mcp.name"
+                    variant="nested"
+                >
+                    <template #header="{ item: mcp }">
+                        <div class="position-relative d-inline-block me-3">
+                            <i class="fa fa-wrench"/>
+                            <span class="position-absolute top-100 start-100 p-1 rounded-circle"
+                                  :class="{
+                                      'bg-approval-ask': getEffectiveApproval(mcp) === 'ask',
+                                      'bg-approval-deny': getEffectiveApproval(mcp) === 'deny',
+                                      'bg-approval-allow': getEffectiveApproval(mcp) === 'allow'
+                                  }" style="outline: 2px solid var(--surface-color); transform: translate(-30%, -90%);">
+                                <span class="visually-hidden">Approval State</span>
+                            </span>
+                        </div>
+                        {{ mcp.name }}
+                    </template>
 
-                <!-- body -->
-                <div :id="'mcp-body-' + mcpServerIndex" class="accordion-collapse collapse"
-                     :aria-labelledby="'mcp-header-' + mcpServerIndex" :data-bs-parent="'#mcp-accordion'">
-                    <div class="list-group list-group-flush" :id="'mcp-accordion-' + mcpServerIndex">
-                        <div v-for="(mcp, mcpIndex) in mcpContent" :key="mcpIndex" class="list-group-item">
+                    <template #body="{ item: mcp, index: mcpIndex }">
+                        <div class="mcp-body">
+                            <p v-if="mcp.description" class="mb-2">
+                                <strong>{{ Localizer.get('agents_description') }}:</strong>
+                                {{ mcp.description }}
+                            </p>
+                            <div class="d-flex align-items-center">
+                                <strong class="me-2">Approval:</strong>
+                                <div class="btn-group btn-group-sm w-100" role="group">
+                                    <input type="radio" class="btn-check" :name="'approval-' + mcpServerIndex + '-' + mcpIndex" :id="'btn-ask-' + mcpServerIndex + '-' + mcpIndex" autocomplete="off"
+                                        @change="e => setApproval(mcp.server_label, mcp.name, 'ask')"
+                                        :checked="getEffectiveApproval(mcp) === 'ask'"
+                                        :disabled="isForbiddenApplied(mcp)">
+                                    <label class="btn btn-outline-secondary approval-ask" :for="'btn-ask-' + mcpServerIndex + '-' + mcpIndex">Ask</label>
 
-                            <!-- header -->
-                            <button class="mcp-header-button collapsed"
-                                    type="button" data-bs-toggle="collapse"
-                                    :data-bs-target="'#mcp-body-' + mcpServerIndex + '-' + mcpIndex"
-                                    aria-expanded="false"
-                                    :aria-controls="'mcp-body-' + mcpServerIndex + '-' + mcpIndex">
-                                <div class="position-relative d-inline-block me-3">
-                                    <i class="fa fa-wrench"/>
-                                    <span class="position-absolute top-100 start-100 p-1 rounded-circle"
-                                          :class="{
-                                              'bg-approval-ask': getEffectiveApproval(mcp) === 'ask',
-                                              'bg-approval-deny': getEffectiveApproval(mcp) === 'deny',
-                                              'bg-approval-allow': getEffectiveApproval(mcp) === 'allow'
-                                          }" style="outline: 2px solid var(--surface-color); transform: translate(-30%, -90%);">
-                                        <span class="visually-hidden">Approval State</span>
-                                    </span>
-                                </div>
-                                {{ mcp.name }}
-                            </button>
+                                    <input type="radio" class="btn-check" :name="'approval-' + mcpServerIndex + '-' + mcpIndex" :id="'btn-deny-' + mcpServerIndex + '-' + mcpIndex" autocomplete="off"
+                                        @change="e => setApproval(mcp.server_label, mcp.name, 'deny')"
+                                        :checked="getEffectiveApproval(mcp) === 'deny'"
+                                        :disabled="isForbiddenApplied(mcp)">
+                                    <label class="btn btn-outline-secondary approval-deny" :for="'btn-deny-' + mcpServerIndex + '-' + mcpIndex">Deny</label>
 
-                            <!-- mcp body -->
-                            <div :id="'mcp-body-' + mcpServerIndex + '-' + mcpIndex" class="accordion-collapse collapse mcp-body"
-                                 :aria-labelledby="'mcp-header-' + mcpServerIndex + '-' + mcpIndex" :data-bs-parent="'#mcp-accordion-' + mcpServerIndex">
-                                <p v-if="mcp.description" class="mb-2">
-                                    <strong>{{ Localizer.get('agents_description') }}:</strong>
-                                    {{ mcp.description }}
-                                </p>
-                                <div class="d-flex align-items-center">
-                                    <strong class="me-2">Approval:</strong>
-                                    <div class="btn-group btn-group-sm w-100" role="group">
-                                        <input type="radio" class="btn-check" :name="'approval-' + mcpServerIndex + '-' + mcpIndex" :id="'btn-ask-' + mcpServerIndex + '-' + mcpIndex" autocomplete="off"
-                                            @change="e => setApproval(mcp.server_label, mcp.name, 'ask')"
-                                            :checked="getEffectiveApproval(mcp) === 'ask'"
-                                            :disabled="isForbiddenApplied(mcp)">
-                                        <label class="btn btn-outline-secondary approval-ask" :for="'btn-ask-' + mcpServerIndex + '-' + mcpIndex">Ask</label>
-
-                                        <input type="radio" class="btn-check" :name="'approval-' + mcpServerIndex + '-' + mcpIndex" :id="'btn-deny-' + mcpServerIndex + '-' + mcpIndex" autocomplete="off"
-                                            @change="e => setApproval(mcp.server_label, mcp.name, 'deny')"
-                                            :checked="getEffectiveApproval(mcp) === 'deny'"
-                                            :disabled="isForbiddenApplied(mcp)">
-                                        <label class="btn btn-outline-secondary approval-deny" :for="'btn-deny-' + mcpServerIndex + '-' + mcpIndex">Deny</label>
-
-                                        <input type="radio" class="btn-check" :name="'approval-' + mcpServerIndex + '-' + mcpIndex" :id="'btn-allow-' + mcpServerIndex + '-' + mcpIndex" autocomplete="off"
-                                            @change="e => setApproval(mcp.server_label, mcp.name, 'allow')"
-                                            :checked="getEffectiveApproval(mcp) === 'allow'"
-                                            :disabled="isForbiddenApplied(mcp) || isConfirmationApplied(mcp)">
-                                        <label class="btn btn-outline-secondary approval-allow" :for="'btn-allow-' + mcpServerIndex + '-' + mcpIndex">Allow</label>
-                                    </div>
+                                    <input type="radio" class="btn-check" :name="'approval-' + mcpServerIndex + '-' + mcpIndex" :id="'btn-allow-' + mcpServerIndex + '-' + mcpIndex" autocomplete="off"
+                                        @change="e => setApproval(mcp.server_label, mcp.name, 'allow')"
+                                        :checked="getEffectiveApproval(mcp) === 'allow'"
+                                        :disabled="isForbiddenApplied(mcp) || isConfirmationApplied(mcp)">
+                                    <label class="btn btn-outline-secondary approval-allow" :for="'btn-allow-' + mcpServerIndex + '-' + mcpIndex">Allow</label>
                                 </div>
                             </div>
                         </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+                    </template>
+                </AppAccordion>
+            </template>
+        </AppAccordion>
     </div>
     <button type="button"
             class="btn btn-primary py-2 w-100"
@@ -113,12 +103,13 @@
 import Localizer from "../../Localizer.js";
 import { useDevice } from "../../useIsMobile.js";
 import backendClient from "../../utils.js";
+import AppAccordion from '../AppAccordion.vue';
 import InputDialogue from '../InputDialogue.vue';
 import { getEffectiveApproval, isConfirmationTool, isForbiddenTool } from '../../approvalUtils.js';
 
 export default {
     name: 'SidebarMcp',
-    components: {InputDialogue},
+    components: {AppAccordion, InputDialogue},
     props: {
         isPlatformConnected: Boolean,
     },
@@ -209,6 +200,11 @@ export default {
                 }, {});
         },
 
+        getMcpServers() {
+            return Object.entries(this.getMcp())
+                .map(([name, tools]) => ({name, tools}));
+        },
+
         getEffectiveApproval(mcp) {
             return getEffectiveApproval(`${mcp.server_label}--${mcp.name}`, mcp.approval, this.restrictedActions);
         },
@@ -277,27 +273,8 @@ export default {
 </script>
 
 <style scoped>
-.mcp-header-button {
-    background-color: transparent;
-    color: inherit;
-    padding: 0 1rem;
-    border: none;
-    box-shadow: none;
-    text-align: left;
-    width: 100%;
-    font-weight: bold;
-}
-
-.mcp-header-button:focus {
-    outline: none;
-}
-
-.mcp-header-button::after {
-    display: none;
-}
-
 .mcp-body {
-    padding: 0.5rem 0;
+    padding: 0.5rem;
 }
 
 .delete-icon {
