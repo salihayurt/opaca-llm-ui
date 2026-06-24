@@ -1,81 +1,77 @@
 <template>
-<div class="container d-flex flex-column flex-grow-1 overflow-hidden">
-    <InputDialogue ref="input" />
-
+<div class="container flex-grow-1 overflow-hidden overflow-y-auto">
     <div v-if="!isMobile" class="sidebar-title">
         {{ Localizer.get('sidebar_promptMacros') }}
     </div>
 
-    <div class="flex-grow-1 overflow-y-auto">
-        <div v-if="isLoading" class="text-secondary p-3">
-            <i class="fa fa-circle-notch fa-spin me-1" />
-            {{ Localizer.get('promptMacros_loading') }}
-        </div>
-
-        <div v-else-if="errorMessage" class="text-danger p-3">
-            {{ errorMessage }}
-        </div>
-
-        <div v-else-if="promptMacros.length === 0" class="text-secondary p-4">
-            {{ Localizer.get('promptMacros_missing') }}
-        </div>
-
-        <div v-else id="prompt-macros-accordion" class="accordion text-start">
-            <div v-for="(macro, index) in promptMacros"
-                 :key="macro.id"
-                 class="accordion-item"
-                 :class="{ 'macro-disabled': !macro.enabled }">
-                <h2 class="accordion-header m-0">
-                    <button class="accordion-button collapsed"
-                            type="button"
-                            data-bs-toggle="collapse"
-                            :data-bs-target="`#prompt-macro-${index}`"
-                            aria-expanded="false"
-                            :aria-controls="`prompt-macro-${index}`">
-                        <i class="fa fa-cubes-stacked me-3" />
-                        <strong class="macro-name">{{ macro.name }}</strong>
-
-                        <span class="macro-actions ms-auto">
-                            <i class="fa fa-lg macro-action"
-                               :class="macro.enabled ? 'fa-toggle-on' : 'fa-toggle-off'"
-                               @click.stop="toggleMacro(macro)"
-                               :title="Localizer.get(macro.enabled ? 'promptMacros_disable' : 'promptMacros_enable')" />
-                            <i class="fa fa-remove macro-action"
-                               @click.stop="deleteMacro(macro)"
-                               :title="Localizer.get('promptMacros_delete')" />
-                        </span>
-                    </button>
-                </h2>
-
-                <div :id="`prompt-macro-${index}`"
-                     class="accordion-collapse collapse"
-                     data-bs-parent="#prompt-macros-accordion">
-                    <div class="accordion-body">
-                        <div class="macro-section">
-                            <strong>{{ Localizer.get('promptMacros_whenToUse') }}</strong>
-                            <p>{{ macro.when_to_use }}</p>
-                        </div>
-                        <div class="macro-section">
-                            <strong>{{ Localizer.get('promptMacros_whatToDo') }}</strong>
-                            <p class="macro-instructions">{{ macro.what_to_do }}</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+    <div v-if="isLoading">
+        <i class="fa fa-circle-notch fa-spin me-1" />
+        {{ Localizer.get('promptMacros_loading') }}
     </div>
 
+    <div v-if="errorMessage" class="text-danger mb-2">
+        {{ errorMessage }}
+    </div>
+
+    <div v-if="!isLoading && !errorMessage && promptMacros.length === 0">
+        {{ Localizer.get('promptMacros_missing') }}
+    </div>
+
+    <AppAccordion
+        v-if="!isLoading && promptMacros.length > 0"
+        id="prompt-macros-accordion"
+        class="text-start"
+        :items="sortedPromptMacros"
+        :get-key="macro => macro.id"
+    >
+        <template #header="{ item: macro }">
+            <i class="fa fa-cubes-stacked me-3"
+               :class="{ 'macro-disabled': !macro.enabled }" />
+            <strong class="macro-name"
+                    :class="{ 'macro-disabled': !macro.enabled }">
+                {{ macro.name }}
+            </strong>
+
+            <span class="macro-actions">
+                <i class="fa fa-lg macro-action"
+                   :class="macro.enabled ? 'fa-toggle-on' : 'fa-toggle-off'"
+                   @click.stop="toggleMacro(macro)"
+                   :title="Localizer.get(macro.enabled ? 'promptMacros_disable' : 'promptMacros_enable')" />
+                <i class="fa fa-remove macro-action"
+                   @click.stop="deleteMacro(macro)"
+                   :title="Localizer.get('promptMacros_delete')" />
+            </span>
+        </template>
+
+        <template #body="{ item: macro }">
+            <div class="macro-body"
+                 :class="{ 'macro-disabled': !macro.enabled }">
+                <div class="macro-section">
+                    <strong>{{ Localizer.get('promptMacros_whenToUse') }}</strong>
+                    <p>{{ macro.when_to_use }}</p>
+                </div>
+                <div class="macro-section">
+                    <strong>{{ Localizer.get('promptMacros_whatToDo') }}</strong>
+                    <p class="macro-instructions">{{ macro.what_to_do }}</p>
+                </div>
+            </div>
+        </template>
+    </AppAccordion>
+
     <button type="button"
-            class="btn btn-primary py-2 w-100 mt-3"
+            class="btn btn-primary py-2 w-100"
             :disabled="isSaving"
-            @click="addPromptMacro">
-        <i class="fa fa-plus" />
+            @click.stop="addPromptMacro">
+        <i class="fa fa-plus me-2" />
         {{ Localizer.get('promptMacros_add') }}
     </button>
+
+    <InputDialogue ref="input" />
 </div>
 </template>
 
 <script>
+import AppAccordion from "../AppAccordion.vue";
 import InputDialogue from "../InputDialogue.vue";
 import Localizer from "../../Localizer.js";
 import backendClient from "../../utils.js";
@@ -83,7 +79,7 @@ import { useDevice } from "../../useIsMobile.js";
 
 export default {
     name: "SidebarPromptMacros",
-    components: { InputDialogue },
+    components: { AppAccordion, InputDialogue },
     setup() {
         const { isMobile } = useDevice();
         return { Localizer, isMobile };
@@ -180,18 +176,33 @@ export default {
         },
 
         async deleteMacro(macro) {
-            if (this.isSaving || !confirm(Localizer.get("promptMacros_delete_confirm", macro.name))) return;
-            this.isSaving = true;
-            this.errorMessage = "";
-            try {
-                await backendClient.deletePromptMacro(macro.id);
-                this.promptMacros = this.promptMacros.filter(item => item.id !== macro.id);
-            } catch (error) {
-                console.error("Failed to delete prompt macro", error);
-                this.errorMessage = Localizer.get("promptMacros_deleteFailed");
-            } finally {
-                this.isSaving = false;
-            }
+            if (this.isSaving) return;
+            await this.$refs.input.showDialogue(
+                Localizer.get("promptMacros_delete"),
+                Localizer.get("promptMacros_delete_confirm", macro.name),
+                null,
+                {},
+                async () => {
+                    this.isSaving = true;
+                    this.errorMessage = "";
+                    try {
+                        await backendClient.deletePromptMacro(macro.id);
+                        this.promptMacros = this.promptMacros.filter(item => item.id !== macro.id);
+                    } catch (error) {
+                        console.error("Failed to delete prompt macro", error);
+                        this.errorMessage = Localizer.get("promptMacros_deleteFailed");
+                        throw new Error(Localizer.get("promptMacros_deleteFailed"));
+                    } finally {
+                        this.isSaving = false;
+                    }
+                },
+            );
+        },
+    },
+    computed: {
+        sortedPromptMacros() {
+            return [...this.promptMacros]
+                .sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
         },
     },
     mounted() {
@@ -202,6 +213,7 @@ export default {
 
 <style scoped>
 .macro-name {
+    flex: 1 1 auto;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -209,9 +221,9 @@ export default {
 }
 
 .macro-actions {
+    flex: 0 0 auto;
     display: inline-flex;
     align-items: center;
-    padding-right: 1.5rem;
 }
 
 .macro-action {
@@ -223,6 +235,7 @@ export default {
     justify-content: center;
     border-radius: 50%;
     cursor: pointer;
+    margin-right: 0 !important;
 }
 
 .macro-action:hover {
@@ -241,10 +254,12 @@ export default {
     color: var(--text-danger-color);
 }
 
-.macro-disabled .macro-name,
-.macro-disabled .fa-cubes-stacked,
-.macro-disabled .accordion-body {
+.macro-disabled {
     opacity: 0.5;
+}
+
+.macro-body {
+    padding: 0.75rem;
 }
 
 .macro-section + .macro-section {
