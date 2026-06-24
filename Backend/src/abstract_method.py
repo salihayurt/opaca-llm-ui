@@ -189,7 +189,7 @@ class AbstractMethod(ABC):
                             logger.warning("Received tool call without a name, skipping.")
                             continue
 
-                        tool_type = self.determine_tool_type(t.name)
+                        tool_type = self.tool_caller.determine_tool_type(t.name)
 
                         try:
                             tool = ToolCall(name=t.name, type=tool_type, id=self.next_tool_id(agent_message), args=json.loads(t.arguments))
@@ -214,16 +214,6 @@ class AbstractMethod(ABC):
         logger.info(agent_message.content or agent_message.tools or agent_message.formatted_output, extra={"agent_name": agent})
 
         return agent_message
-
-    def determine_tool_type(self, tool_name: str) -> ToolType:
-        """Determine tool type and name based on presence of server label and matching MCP server/tools"""
-        provider = tool_name.split('--')[0]
-        if self.internal_tools and self.internal_tools.is_internal_tool(provider):
-            return ToolType.INTERNAL
-        elif provider in self.session.mcp_servers:
-            return ToolType.MCP
-        else:
-            return ToolType.OPACA
 
     async def send_to_websocket(self, message: BaseModel):
         if self.session.has_websocket() and self.streaming:

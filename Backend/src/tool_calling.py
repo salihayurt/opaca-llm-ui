@@ -28,6 +28,18 @@ class ToolCaller:
         self.streaming = streaming
         self.chat_id = chat_id
 
+
+    def determine_tool_type(self, tool_name: str) -> ToolType:
+        """Determine tool type and name based on presence of server label and matching MCP server/tools"""
+        provider = tool_name.split('--')[0]
+        if self.internal_tools and self.internal_tools.is_internal_tool(provider):
+            return ToolType.INTERNAL
+        elif provider in self.session.mcp_servers:
+            return ToolType.MCP
+        else:
+            return ToolType.OPACA
+
+
     async def invoke_tool(self, tool: ToolCall, login_attempt_retry: bool = False) -> ToolCall:
         """
         Invoke tool (OPACA or MCP) matching the given ToolCall. 
