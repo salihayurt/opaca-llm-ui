@@ -3,8 +3,8 @@ import { shuffleArray } from "./utils";
 import conf from '../config';
 import { type Prompt, type PromptCategory } from './models';
 
-/** 
- * Interface for the translation object structure 
+/**
+ * Interface for the translation object structure
  * Using an index signature [key: string] allows for the many dynamic keys
  */
 interface TranslationSchema {
@@ -54,6 +54,7 @@ const localizationData: LocalizationData = {
         sidebar_questions: "Prompt Library",
         sidebar_files: "Uploaded Files",
         sidebar_agents: "Agents and Actions",
+        sidebar_promptMacros: "Prompt Macros",
         sidebar_extensions: "Extensions",
         sidebar_mcp: "MCP Servers",
         sidebar_config: "Configuration",
@@ -107,6 +108,19 @@ const localizationData: LocalizationData = {
         mcp_missing: "No MCP servers available.",
         mcp_add: "Add MCP Server",
         mcp_remove: "Remove MCP Server",
+        promptMacros_loading: "Loading prompt macros...",
+        promptMacros_missing: "No prompt macros available.",
+        promptMacros_add: "Add Prompt Macro",
+        promptMacros_delete: "Delete Prompt Macro",
+        promptMacros_delete_confirm: "Delete prompt macro \"%1\"?",
+        promptMacros_enable: "Enable Prompt Macro",
+        promptMacros_disable: "Disable Prompt Macro",
+        promptMacros_name: "Name",
+        promptMacros_whenToUse: "When to use",
+        promptMacros_whatToDo: "What to do",
+        promptMacros_loadFailed: "Could not load prompt macros.",
+        promptMacros_saveFailed: "Could not save prompt macros.",
+        promptMacros_deleteFailed: "Could not delete prompt macro.",
         info_missing: "It's a little quiet here...",
         info_loading: "Querying functionality, please wait...",
         info_failed: "There was an error when querying the functionality: %1",
@@ -194,6 +208,7 @@ const localizationData: LocalizationData = {
         sidebar_questions: "Prompt-Bibliothek",
         sidebar_files: "Hochgeladene Dateien",
         sidebar_agents: "Agenten und Aktionen",
+        sidebar_promptMacros: "Prompt Macros",
         sidebar_extensions: "Erweiterungen",
         sidebar_mcp: "MCP Servers",
         sidebar_config: "Konfiguration",
@@ -243,6 +258,19 @@ const localizationData: LocalizationData = {
         mcp_missing: "Keine MCP-Server verfügbar.",
         mcp_add: "MCP Server hinzufügen",
         mcp_remove: "MCP Server entfernen",
+        promptMacros_loading: "Prompt Macros werden geladen...",
+        promptMacros_missing: "Keine Prompt Macros verfügbar.",
+        promptMacros_add: "Prompt Macro hinzufügen",
+        promptMacros_delete: "Prompt Macro löschen",
+        promptMacros_delete_confirm: "Prompt Macro \"%1\" löschen?",
+        promptMacros_enable: "Prompt Macro aktivieren",
+        promptMacros_disable: "Prompt Macro deaktivieren",
+        promptMacros_name: "Name",
+        promptMacros_whenToUse: "Wann verwenden",
+        promptMacros_whatToDo: "Was tun",
+        promptMacros_loadFailed: "Prompt Macros konnten nicht geladen werden.",
+        promptMacros_saveFailed: "Prompt Macros konnten nicht gespeichert werden.",
+        promptMacros_deleteFailed: "Prompt Macro konnte nicht gelöscht werden.",
         files_textHandling_title: "Textdatei gefunden",
         files_textHandling_message: "Das Hochladen von Textdateien ist derzeit nicht möglich. Möchten Sie den Text stattdessen in die Nachricht einfügen?",
         files_textHandling_insert: "In Nachricht einfügen",
@@ -448,7 +476,7 @@ export class Localizer {
     toLocaleString(isotime: string): string {
         return new Date(Date.parse(isotime)).toLocaleString(this.languageCode);
     }
-    
+
 }
 
 /**

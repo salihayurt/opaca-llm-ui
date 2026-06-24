@@ -19,6 +19,7 @@ import type {
     ToolApprovalState,
     MCPTool,
     MCPCreateRequest,
+    PromptMacro,
 } from "./models";
 
 class BackendClient {
@@ -190,6 +191,24 @@ class BackendClient {
 
     async resetPrompts(): Promise<void> {
         return await this.sendRequest("DELETE", "prompts");
+    }
+
+    // prompt macros
+
+    async getPromptMacros(): Promise<PromptMacro[]> {
+        return await this.sendRequest("GET", "prompt-macros");
+    }
+
+    async savePromptMacro(promptMacro: PromptMacro): Promise<void> {
+        return await this.sendRequest("POST", "prompt-macros", promptMacro);
+    }
+
+    async setPromptMacroEnabled(promptMacro: PromptMacro, enabled: boolean): Promise<void> {
+        return await this.savePromptMacro({...promptMacro, enabled});
+    }
+
+    async deletePromptMacro(macroId: string): Promise<void> {
+        return await this.sendRequest("DELETE", `prompt-macros/${encodeURIComponent(macroId)}`);
     }
 
     async getContainerApprovals(containerId: string): Promise<Record<string, ToolApprovalState>> {

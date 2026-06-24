@@ -562,17 +562,16 @@ async def get_prompt_macros(session: SessionData = Depends(handle_session_http))
     return session.prompt_macros
 
 
-@app.post("/prompt-macros", description="Save user-defined prompt macros for the current session.", tags=["prompt macros"])
-async def post_prompt_macros(data: List[PromptMacro], session: SessionData = Depends(handle_session_http)) -> None:
-    macro_ids = [macro.id for macro in data]
-    if len(macro_ids) != len(set(macro_ids)):
-        raise ValueError("Prompt macro IDs must be unique.")
-    session.prompt_macros = data
+@app.post("/prompt-macros", description="Add or update a prompt macro for the current session.", tags=["prompt macros"])
+async def post_prompt_macro(data: PromptMacro, session: SessionData = Depends(handle_session_http)) -> None:
+    session.set_prompt_macro(data)
 
 
-@app.delete("/prompt-macros", description="Reset prompt macros for the current session.", tags=["prompt macros"])
-async def reset_prompt_macros(session: SessionData = Depends(handle_session_http)) -> None:
-    session.prompt_macros = []
+@app.delete("/prompt-macros/{macro_id}", description="Delete a prompt macro from the current session.", tags=["prompt macros"])
+async def delete_prompt_macro(macro_id: str, session: SessionData = Depends(handle_session_http)) -> Response:
+    if not session.delete_prompt_macro(macro_id):
+        raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail=f"Prompt macro '{macro_id}' not found.")
+    return Response(status_code=HTTPStatus.NO_CONTENT)
 
 
 # WHISPER TTS/STT

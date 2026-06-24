@@ -441,6 +441,20 @@ class SessionData(BaseModel):
     def enabled_prompt_macros(self) -> List[PromptMacro]:
         return [macro for macro in self.prompt_macros if macro.enabled]
 
+    def set_prompt_macro(self, prompt_macro: PromptMacro) -> None:
+        for index, current_macro in enumerate(self.prompt_macros):
+            if current_macro.id == prompt_macro.id:
+                self.prompt_macros[index] = prompt_macro
+                return
+        self.prompt_macros.append(prompt_macro)
+
+    def delete_prompt_macro(self, macro_id: str) -> bool:
+        for index, prompt_macro in enumerate(self.prompt_macros):
+            if prompt_macro.id == macro_id:
+                self.prompt_macros.pop(index)
+                return True
+        return False
+
     @property
     def opaca_client(self) -> OpacaClient:
         return self._opaca_client

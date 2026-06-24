@@ -129,6 +129,14 @@ export interface PromptCategory {
 
 export type SessionPrompts = Record<string, PromptCategory[]>;
 
+export interface PromptMacro {
+    id: string;
+    name: string;
+    when_to_use: string;
+    what_to_do: string;
+    enabled: boolean;
+}
+
 export interface LLMParameters {
     temperature: number;
     reasoning_effort: string;

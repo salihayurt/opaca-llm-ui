@@ -44,6 +44,11 @@
                    :title="Localizer.get('sidebar_agents')"
                    v-bind:class="{'sidebar-menu-item-select': SidebarManager.isViewSelected('agents')}"/>
 
+                <i @click="SidebarManager.toggleView('promptMacros')"
+                   class="fa fa-cubes-stacked sidebar-menu-item"
+                   :title="Localizer.get('sidebar_promptMacros')"
+                   v-bind:class="{'sidebar-menu-item-select': SidebarManager.isViewSelected('promptMacros')}"/>
+
                 <i @click="SidebarManager.toggleView('extensions')"
                    class="fa fa-puzzle-piece sidebar-menu-item"
                    :title="Localizer.get('sidebar_extensions')"
@@ -129,6 +134,12 @@
                     ref="agents"
                 />
 
+                <!-- prompt macros -->
+                <SidebarPromptMacros
+                    v-show="SidebarManager.isViewSelected('promptMacros')"
+                    ref="promptMacros"
+                />
+
                 <!-- UI extensions -->
                 <SidebarExtensions
                     v-show="SidebarManager.isViewSelected('extensions')"
@@ -183,6 +194,7 @@ import SidebarFaq from "./SidebarFaq.vue";
 import SidebarChats from "./SidebarChats.vue";
 import SidebarFiles from "./SidebarFiles.vue";
 import SidebarMcp from "./SidebarMcp.vue";
+import SidebarPromptMacros from "./SidebarPromptMacros.vue";
 import backendClient from "../../utils.js";
 
 export default {
@@ -196,6 +208,7 @@ export default {
         SidebarInfo,
         SidebarConfig,
         SidebarAgents,
+        SidebarPromptMacros,
         SidebarExtensions,
         SidebarQuestions,
     },

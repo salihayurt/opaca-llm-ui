@@ -8,6 +8,7 @@ const AVAILABLE_VIEWS = [
     'files',
     'questions',
     'agents',
+    'promptMacros',
     'extensions',
     'mcp',
     'config',
@@ -91,7 +92,7 @@ export class SidebarManager {
     }
 
     viewNotInCollapsed(key: SidebarView): boolean {
-        const restrictedViews: SidebarView[] = ['files', 'agents', 'extensions', 'mcp', 'config', 'debug'];
+        const restrictedViews: SidebarView[] = ['files', 'agents', 'promptMacros', 'extensions', 'mcp', 'config', 'debug'];
         return restrictedViews.includes(key);
     }
 }
