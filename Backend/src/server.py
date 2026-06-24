@@ -35,7 +35,7 @@ from .file_utils import delete_file_from_all_clients, save_file_to_disk, create_
 from .session_manager import create_or_refresh_session, cleanup_task, on_shutdown, load_all_sessions, \
     restore_scheduled_tasks, get_all_sessions, update_session, SessionAction
 from .opaca_client import actions_blacklist
-from .abstract_method import actions_needing_confirmation
+from .tool_calling import actions_needing_confirmation
 
 # Configure CORS settings
 origins = os.getenv('CORS_WHITELIST', 'http://localhost:5173').split(";")
