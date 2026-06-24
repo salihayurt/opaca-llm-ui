@@ -35,7 +35,7 @@ class PromptMacroTools:
             macro_lines.append(
                 f"- macro_id: {macro.id}\n"
                 f"  Name: {macro.name}\n"
-                f"  When to use: {macro.description}"
+                f"  When to use: {macro.when_to_use}"
             )
         macros_text = "\n".join(macro_lines)
 
@@ -61,5 +61,5 @@ class PromptMacroTools:
             Prompt macro loaded: {macro.name}
 
             Follow these user-defined instructions for the current request:
-            {macro.instructions}
+            {macro.what_to_do}
         """).strip()
