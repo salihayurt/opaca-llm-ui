@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import uuid
 from textwrap import dedent
 
 from ..models import InternalTool, PromptMacro
@@ -13,18 +14,38 @@ class PromptMacroTools:
         self.ctx = ctx
 
     def tools(self) -> list[InternalTool]:
-        if not self._enabled_macros():
-            return []
-
-        return [
+        tools = [
             InternalTool(
-                name="LoadPromptMacro",
-                description=self._loader_description(),
-                params={"macro_id": "string"},
-                result="string",
-                function=self.tool_load_prompt_macro,
+                name="CreatePromptMacro",
+                description=(
+                    "Create and enable a reusable prompt macro for future user requests. "
+                    "Use this when the user explicitly asks to define, remember, or save reusable behavior. "
+                    "Describe when the macro should be loaded and the detailed instructions to follow. "
+                    "Do not create a macro merely to fulfill a one-time request."
+                ),
+                params={
+                    "name": "string",
+                    "when_to_use": "string",
+                    "what_to_do": "string",
+                },
+                result="object",
+                function=self.tool_create_prompt_macro,
             ),
         ]
+
+        if self._enabled_macros():
+            tools.insert(
+                0,
+                InternalTool(
+                    name="LoadPromptMacro",
+                    description=self._loader_description(),
+                    params={"macro_id": "string"},
+                    result="string",
+                    function=self.tool_load_prompt_macro,
+                ),
+            )
+
+        return tools
 
     def _enabled_macros(self) -> list[PromptMacro]:
         return self.ctx.session.enabled_prompt_macros()
@@ -50,6 +71,25 @@ class PromptMacroTools:
 
             Pass the exact macro_id of the matching macro.
         """).strip()
+
+    async def tool_create_prompt_macro(self, name: str, when_to_use: str, what_to_do: str) -> dict:
+        values = {
+            "name": name.strip(),
+            "when_to_use": when_to_use.strip(),
+            "what_to_do": what_to_do.strip(),
+        }
+        if not all(values.values()):
+            raise ValueError("Prompt macro name, usage description, and instructions must not be empty.")
+
+        prompt_macro = PromptMacro(
+            id=str(uuid.uuid4()),
+            **values,
+        )
+        self.ctx.session.set_prompt_macro(prompt_macro)
+        return {
+            "created": True,
+            "prompt_macro": prompt_macro.model_dump(),
+        }
 
     async def tool_load_prompt_macro(self, macro_id: str) -> str:
         macro = next((m for m in self._enabled_macros() if m.id == macro_id), None)

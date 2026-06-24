@@ -137,6 +137,7 @@
                 <!-- prompt macros -->
                 <SidebarPromptMacros
                     v-show="SidebarManager.isViewSelected('promptMacros')"
+                    :sidebar-view="SidebarManager.getSelectedView()"
                     ref="promptMacros"
                 />
 

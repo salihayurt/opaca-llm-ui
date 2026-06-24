@@ -80,6 +80,9 @@ import { useDevice } from "../../useIsMobile.js";
 export default {
     name: "SidebarPromptMacros",
     components: { AppAccordion, InputDialogue },
+    props: {
+        sidebarView: String,
+    },
     setup() {
         const { isMobile } = useDevice();
         return { Localizer, isMobile };
@@ -205,8 +208,12 @@ export default {
                 .sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
         },
     },
-    mounted() {
-        this.loadPromptMacros();
+    watch: {
+        sidebarView(newView) {
+            if (newView === "promptMacros") {
+                this.loadPromptMacros();
+            }
+        },
     },
 };
 </script>
