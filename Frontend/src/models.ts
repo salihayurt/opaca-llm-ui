@@ -45,7 +45,7 @@ export interface MCPCreateRequest {
 
 export interface ToolCall {
     id: string;
-    type: "opaca" | "mcp" | string;
+    type: "opaca" | "mcp" | "internal" | string;
     name: string;
     args: Record<string, any>;
     result: any | null;

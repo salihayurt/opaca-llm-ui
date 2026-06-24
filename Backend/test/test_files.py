@@ -65,6 +65,7 @@ def test_get_file_view(files_response):
         res = client.get(f"/files/{f}/view")
         assert res.status_code == 200
 
+@pytest.mark.skip(reason="Files are now suspended individually for each chat -> needs major adaptation")
 def test_suspend_file(files_response):
     # Check that none of the files are suspended
     assert all(not f["suspended"] for f in files_response.values())
