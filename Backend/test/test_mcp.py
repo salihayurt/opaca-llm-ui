@@ -14,9 +14,9 @@ def test_add_mcp():
         "type": "mcp",
         "server_url": "https://mcp.deepwiki.com/mcp",
         "server_label": "DeepWiki",
-        "require_approval": "never"
+        "default_approval": "allow"
     }
-    res = client.post("/mcp", json={"content": mcp_content})
+    res = client.post("/mcp", json=mcp_content)
     assert res.status_code == 201
 
 def test_get_mcp():
@@ -29,9 +29,9 @@ def test_add_mcp_invalid_url():
         "type": "mcp",
         "server_url": "https://example.com",
         "server_label": "DeepWiki",
-        "require_approval": "never"
+        "default_approval": "allow"
     }
-    res = client.post("/mcp", json={"content": mcp_content})
+    res = client.post("/mcp", json=mcp_content)
     assert res.status_code == 400
 
 def test_add_mcp_duplicate():
@@ -39,9 +39,9 @@ def test_add_mcp_duplicate():
         "type": "mcp",
         "server_url": "https://mcp.deepwiki.com/mcp",
         "server_label": "DeepWiki",
-        "require_approval": "never"
+        "default_approval": "allow"
     }
-    res = client.post("/mcp", json={"content": mcp_content})
+    res = client.post("/mcp", json=mcp_content)
     assert res.status_code == 400
 
 def test_delete_mcp():
@@ -57,9 +57,9 @@ def test_add_mcp_without_server_label():
         "type": "mcp",
         "server_url": "https://mcp.deepwiki.com/mcp",
         "server_label": "",
-        "require_approval": "never"
+        "default_approval": "allow"
     }
-    res = client.post("/mcp", json={"content": mcp_content})
+    res = client.post("/mcp", json=mcp_content)
     assert res.status_code == 201
 
     res = client.get("/mcp")

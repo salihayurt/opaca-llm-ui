@@ -19,12 +19,12 @@ from litellm.types.llms.openai import ResponsesAPIStreamEvents as event_type
 from mcp.types import CallToolRequestParams
 
 from .models import (ToolApprovalState, SessionData, QueryResponse, AgentMessage, ChatMessage, OpacaException, Chat,
-                     ToolCall, ContainerLoginNotification, ContainerLoginResponse, ToolCallMessage,
+                     ToolCall, ToolType, ContainerLoginNotification, ContainerLoginResponse, ToolCallMessage,
                      ToolResultMessage, TextChunkMessage, MetricsMessage, StatusMessage, MethodConfig,
                      MissingApiKeyNotification, MissingApiKeyResponse, ConfirmActionNotification, ConfirmActionResponse,
                      LLMConfig)
 from .file_utils import upload_files
-from .internal_tools import InternalTools, INTERNAL_TOOLS_AGENT_NAME
+from .internal_tools import InternalTools
 from .opaca_client import actions_blacklist
 
 
@@ -67,15 +67,20 @@ class AbstractMethod(ABC):
     def next_tool_id(self, agent_message: AgentMessage):
         return f"{agent_message.id}/{next(self.tool_counter)}"
 
-    @staticmethod
-    def _resolve_tool_approval(tool_name: str, user_approval: ToolApprovalState) -> ToolApprovalState:
-        if any(x.lower() in tool_name.lower() for x in actions_blacklist):
+    def _resolve_tool_approval(self, tool: ToolCall) -> ToolApprovalState:
+        if tool.type == ToolType.MCP:
+            server_label, tool_name = tool.name.split('--', maxsplit=1)
+            user_approval = self.session.get_mcp_tool(server_label, tool_name).approval
+        else:
+            user_approval = self.session.get_opaca_tool_approval(tool.name)
+
+        if any(x.lower() in tool.name.lower() for x in actions_blacklist):
             # First the admin blacklist is applied
             return ToolApprovalState.DENY
         if user_approval == ToolApprovalState.DENY:
             # Then the user's approval setting for the tool
             return ToolApprovalState.DENY
-        if any(x.lower() in tool_name.lower() for x in actions_needing_confirmation):
+        if any(x.lower() in tool.name.lower() for x in actions_needing_confirmation):
             # Then the admin confirmation list
             return ToolApprovalState.ASK
         # Then either the users ask or allow
@@ -209,8 +214,7 @@ class AbstractMethod(ABC):
                             logger.warning("Received tool call without a name, skipping.")
                             continue
 
-                        # Determine tool type and name based on presence of server label and matching MCP server/tools
-                        tool_type = "mcp" if any(t.name in mcp_server.tools for mcp_server in self.session.mcp_servers.values()) else "opaca"
+                        tool_type = self.determine_tool_type(t.name)
 
                         try:
                             tool = ToolCall(name=t.name, type=tool_type, id=self.next_tool_id(agent_message), args=json.loads(t.arguments))
@@ -236,11 +240,23 @@ class AbstractMethod(ABC):
 
         return agent_message
 
+    def determine_tool_type(self, tool_name: str) -> ToolType:
+        """Determine tool type and name based on presence of server label and matching MCP server/tools"""
+        provider = tool_name.split('--')[0]
+        if self.internal_tools and self.internal_tools.is_internal_tool(provider):
+            return ToolType.INTERNAL
+        elif provider in self.session.mcp_servers:
+            return ToolType.MCP
+        else:
+            return ToolType.OPACA
 
     async def send_to_websocket(self, message: BaseModel):
         if self.session.has_websocket() and self.streaming:
             await self.session.websocket_send(message)
 
+    async def invoke_all_tools(self, response: AgentMessage) -> List[ToolCall]:
+        tasks = [self.invoke_tool(tool) for tool in response.tools]
+        return await asyncio.gather(*tasks)
 
     async def invoke_tool(self, tool: ToolCall, login_attempt_retry: bool = False) -> ToolCall:
         """
@@ -248,34 +264,30 @@ class AbstractMethod(ABC):
         If OPACA invoke fails due to required login, attempt Login (via websocket callback) and try again.
         In any case returns a ToolCall, where "result" can be an error message.
         """
-        # MCP Tool Execution Flow
-        if tool.type == "mcp":
-            async def create_result(result):
-                await self.send_to_websocket(ToolResultMessage(id=tool.id, result=result, chat_id=self.chat.chat_id))
-                return ToolCall(id=tool.id, type="mcp", name=tool.name, args=tool.args, result=result)
+        async def create_result(result):
+            await self.send_to_websocket(ToolResultMessage(id=tool.id, result=result, chat_id=self.chat.chat_id))
+            return ToolCall(id=tool.id, type=tool.type, name=tool.name, args=tool.args, result=result)
 
-            server_label, tool_name = tool.name.split('--', maxsplit=1)
-            server = self.session.mcp_servers.get(server_label)
-            if not server:
-                return await create_result(f"MCP Server '{server_label}' not found.")
-            
-            mcp_tool = server.tools.get(tool.name)
-            if not mcp_tool:
-                return await create_result(f"Tool '{tool.name}' not found on MCP Server '{server_label}'.")
+        # If login_attempt_retry=True, the user has already been asked and allowed tool execution
+        if not login_attempt_retry:
+            approval_state = self._resolve_tool_approval(tool)
 
-            approval_state = self._resolve_tool_approval(tool.name, mcp_tool.approval)
             if approval_state == ToolApprovalState.DENY:
                 # Should not happen due to filtering in get_tools, but double-checking approval status just in case it changes in the future
                 return await create_result("Execution denied by user settings, do not attempt again.")
                 
-            if approval_state == ToolApprovalState.ASK:
-                if not await self.check_confirmation(tool.name, tool.args, force_ask=True):
-                    return await create_result("Execution declined by user, do not attempt again.")
+            if approval_state == ToolApprovalState.ASK and not await self.check_confirmation(tool.name, tool.args):
+                return await create_result("Execution declined by user, do not attempt again.")
 
+        # tools are always formatted the same; provider can be MCP server or OPACA agent
+        provider, tool_name = tool.name.split('--', maxsplit=1)
+
+        # MCP Tool Execution Flow
+        if tool.type == ToolType.MCP:
+            server = self.session.mcp_servers.get(provider)
             try:
-                client = MCPClient(server_url=server.params.server_url)
+                client = MCPClient(server_url=server.server_url)
                 res = await client.call_tool(CallToolRequestParams(name=tool_name, arguments=tool.args))
-                
                 if res.isError:
                     t_result = f"Execution failed. Error: {res.content}"
                 else:
@@ -283,49 +295,28 @@ class AbstractMethod(ABC):
             except Exception as e:
                 t_result = f"Failed to invoke MCP tool.\nCause: {e}"
 
-            return await create_result(t_result)
+        # Internal Tool Execution Flow
+        elif tool.type == ToolType.INTERNAL:
+            try:
+                t_result = await self.internal_tools.call_internal_tool(tool_name, tool.args)
+            except Exception as e:
+                t_result = f"Failed to invoke Internal tool.\nCause: {e}"
 
         # OPACA Tool Execution Flow
         else:
-            if "--" in tool.name:
-                agent_name, action_name = tool.name.split('--', maxsplit=1)
-            else:
-                agent_name, action_name = None, tool.name
-
-            # If login_attempt_retry=True, the user has already been asked and allowed tool execution
-            # before the container login was triggered, so we skip this part.
-            if not login_attempt_retry:
-                approval_state = self._resolve_tool_approval(
-                    tool.name,
-                    self.session.get_opaca_tool_approval(tool.name),
-                )
-
-                if approval_state == ToolApprovalState.DENY:
-                    return ToolCall(id=tool.id, type="opaca", name=tool.name, args=tool.args, result="Execution denied by user settings, do not attempt again.")
-                if approval_state == ToolApprovalState.ASK:
-                    if not await self.check_confirmation(tool.name, tool.args, force_ask=True):
-                        return ToolCall(id=tool.id, type="opaca", name=tool.name, args=tool.args, result="Execution declined by user, do not attempt again.")
-
-                if not (login_attempt_retry or await self.check_confirmation(tool.name, tool.args)):
-                    return ToolCall(id=tool.id, type="opaca", name=tool.name, args=tool.args, result="Execution declined by user, do not attempt again.")
-
             try:
-                if agent_name == INTERNAL_TOOLS_AGENT_NAME:
-                    t_result = await self.internal_tools.call_internal_tool(action_name, tool.args)
-                else:
-                    t_result = await self.session.opaca_client.safe_invoke(action_name, agent_name, tool.args)
+                t_result = await self.session.opaca_client.safe_invoke(tool_name, provider, tool.args)
             except httpx.HTTPStatusError as e:
                 res = e.response.json()
-                t_result = f"Failed to invoke tool.\nStatus code: {e.response.status_code}\nResponse: {e.response.text}\nResponse JSON: {res}"
+                t_result = f"Failed to invoke OPACA tool.\nStatus code: {e.response.status_code}\nResponse: {e.response.text}\nResponse JSON: {res}"
                 cause = res.get("cause", {}).get("message", "")
                 status = res.get("cause", {}).get("statusCode", -1)
                 if self.session.has_websocket() and (status in [401, 403] or ("401" in cause or "403" in cause or "credentials" in cause)):
-                    return await self.handle_container_login(agent_name, action_name, tool, login_attempt_retry)
+                    return await self.handle_container_login(provider, tool_name, tool, login_attempt_retry)
             except Exception as e:
-                t_result = f"Failed to invoke tool.\nCause: {e}"
+                t_result = f"Failed to invoke OPACA tool.\nCause: {e}"
 
-            await self.send_to_websocket(ToolResultMessage(id=tool.id, result=t_result, chat_id=self.chat.chat_id))
-            return ToolCall(id=tool.id, type="opaca", name=tool.name, args=tool.args, result=t_result)
+        return await create_result(t_result)
 
 
     async def get_tools(self, include_internal: bool = True, include_mcp: bool = True, max_tools=128) -> tuple[list[dict], str]:
@@ -362,17 +353,15 @@ class AbstractMethod(ABC):
         return tools, error
 
 
-    async def check_confirmation(self, tool_name: str, parameters: dict, force_ask: bool = False) -> bool:
-        """Use websocket to ask user for confirmation before executing the action if it matches any of the "needing confirmation" actions.
+    async def check_confirmation(self, tool_name: str, parameters: dict) -> bool:
+        """Use websocket to ask user for confirmation before executing the action.
         Returns whether the action may be executed or not.
         """
-        if force_ask or any(x.lower() in tool_name.lower() for x in actions_needing_confirmation):
-            if not self.session.has_websocket(): return False
-            # ask user for confirmation, sharing lock-mechanism with container-login
-            async with self.session.opaca_client.login_lock:
-                await self.session.websocket_send(ConfirmActionNotification(tool=tool_name, params=parameters))
-                return ConfirmActionResponse(**await self.session.websocket_receive()).allowed
-        return True
+        if not self.session.has_websocket(): return False
+        # ask user for confirmation, sharing lock-mechanism with container-login
+        async with self.session.opaca_client.login_lock:
+            await self.session.websocket_send(ConfirmActionNotification(tool=tool_name, params=parameters))
+            return ConfirmActionResponse(**await self.session.websocket_receive()).allowed
 
 
     async def handle_container_login(self, agent_name: str, action_name: str, tool: ToolCall, login_attempt_retry: bool = False):

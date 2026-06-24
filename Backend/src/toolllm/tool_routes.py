@@ -122,11 +122,7 @@ class ToolLLMMethod(AbstractMethod):
             self.response.agent_messages.append(result)
 
             # Check if opaca and mcp tools were generated and if so, execute them by calling the opaca-proxy
-            tasks = []
-            for i, call in enumerate(result.tools):
-                tasks.append(self.invoke_tool(call))
-            result.tools = await asyncio.gather(*tasks)
-
+            result.tools = await self.invoke_all_tools(result)
             called_tools[c_it] = self._build_tool_desc(c_it, result.tools)
 
             # If tools were created, summarize their result in natural language

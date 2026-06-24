@@ -121,7 +121,7 @@ async def test_block_session():
 
 # The LOGOUT action internally calls the POST /containers/{id}/logout route
 # We mock this response by returning a 200 status code
-@patch("httpx.AsyncClient.post", new_callable=AsyncMock)
+@patch("httpx.AsyncClient.request", new_callable=AsyncMock)
 @pytest.mark.anyio
 async def test_logout_session(mock_post):
     # Mock the logout call to the OPACA platform

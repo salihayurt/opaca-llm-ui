@@ -150,9 +150,9 @@ class SimpleMethod(AbstractMethod):
         try:
             d = json.loads(llm_response.strip("`json\n")) # strip markdown, if included
             if type(d) is dict:
-                agent_id = d.get("agentId")
-                tool_type = "mcp" if self.session.mcp_servers and agent_id in self.session.mcp_servers else "opaca"
-                return ToolCall(id="0", type=tool_type, name=f'{agent_id}--{d["action"]}', args=d["params"])
+                full_name = f'{d["agentId"]}--{d["action"]}'
+                tool_type = self.determine_tool_type(full_name)
+                return ToolCall(id="0", type=tool_type, name=full_name, args=d["params"])
         except (json.JSONDecodeError, KeyError):
             pass
         return None

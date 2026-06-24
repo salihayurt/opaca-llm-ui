@@ -270,7 +270,7 @@ async def query_no_history(method: str, message: QueryRequest, session: SessionD
 
 @app.get("/mcp", description="Get a list of all added MCP servers and their actions", tags=["mcp"])
 async def get_mcp_list(session: SessionData = Depends(handle_session_http)) -> Dict:
-    return await session.get_mcp_tools()
+    return session.get_mcp_tools()
 
 
 @app.post("/mcp", description="Add a new MCP server to the list of available MCP servers", tags=["mcp"])
@@ -286,10 +286,12 @@ async def delete_mcp_server(server_label: str, session: SessionData = Depends(ha
     else:
         return Response(status_code=404, content="No matching mcp server found!")
 
+
 @app.patch("/mcp/{server_label}/approval", description="Set whether a tool call should be allowed, denied, or require confirmation by the user.", tags=["mcp"])
 async def update_mcp_tool_approval(data: ToolApprovalUpdateRequest, server_label: str, session: SessionData = Depends(handle_session_http)) -> Response:
-    await session.set_mcp_tool_approval(server_label, data.tool_name, data.approval)
+    session.set_mcp_tool_approval(server_label, data.tool_name, data.approval)
     return Response(status_code=204)
+
 
 ### CHAT ROUTES
 
@@ -429,6 +431,7 @@ async def reset_config(method: str, session: SessionData = Depends(handle_sessio
     session.config[method] = METHODS[method].CONFIG()
     return ConfigPayload(config_values=session.config[method], config_schema=METHODS[method].config_schema())
 
+
 ## FILE ROUTES
 
 @app.get("/files", description="Get a list of all uploaded files.", tags=["files"])
@@ -473,8 +476,6 @@ async def delete_file(file_id: str, ignore_error: bool = False, session: Session
     return await delete_file_from_all_clients(session, file_id, ignore_error)
 
 
-
-
 @app.patch("/files/{file_id}", description="Mark a file as suspended or unsuspended.", tags=["files"])
 async def update_file(file_id: str, name: str | None = None, session: SessionData = Depends(handle_session_http)) -> bool:
     files = session.uploaded_files
@@ -486,7 +487,6 @@ async def update_file(file_id: str, name: str | None = None, session: SessionDat
         rename_file(files[file_id], name)
 
     return True
-
 
 
 @app.get("/files/{file_id}/view", description="Serve a previously uploaded file for preview.", tags=["files"])
@@ -511,7 +511,7 @@ async def view_file(file_id: str, session: SessionData = Depends(handle_session_
     )
 
 
-# sample prompts
+# SAMPLE PROMPTS
 
 @app.get("/prompts", description="Get the Prompt Library data for the current session.", tags=["sample prompts"])
 async def get_prompts(session: SessionData = Depends(handle_session_http)) -> SessionPrompts:
