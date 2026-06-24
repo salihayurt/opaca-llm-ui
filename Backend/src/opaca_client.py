@@ -96,6 +96,10 @@ class OpacaClient(AsyncOpacaClient):
             for container in await self.get_containers()
             for agent in container.agents
         }
+    
+    async def get_containers(self):
+        if not self.url: return []
+        return await super().get_containers()
 
     async def get_actions_openapi(self, inline_refs=False) -> dict:
         """Get actions of OPACA agents in OpenAPI format; if inline_refs is true, datatypes will be

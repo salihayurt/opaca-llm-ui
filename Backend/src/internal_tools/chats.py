@@ -8,7 +8,7 @@ from ..models import InternalTool
 
 
 class ChatTools:
-    GROUP_NAME = "Chat History"
+    GROUP_NAME = "ChatHistory"
 
     def __init__(self, ctx: InternalToolContext):
         self.ctx = ctx
