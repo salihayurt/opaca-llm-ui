@@ -289,8 +289,8 @@ class PromptCategory(BaseModel):
 class PromptMacro(BaseModel):
     id: str
     name: str
-    description: str
-    instructions: str
+    when_to_use: str
+    what_to_do: str
     enabled: bool = True
 
 
@@ -303,12 +303,12 @@ def default_prompt_macros() -> List[PromptMacro]:
         PromptMacro(
             id=ROOM_READINESS_PROMPT_MACRO_ID,
             name="Room Readiness Check",
-            description=(
+            when_to_use=(
                 "Use when the user asks whether a room is ready, usable, okay, free, suitable, or prepared "
                 'for a meeting or work session. Examples: "is the conference room ready?", '
                 '"is Focus Space okay for a meeting?".'
             ),
-            instructions=(
+            what_to_do=(
                 "Interpret the request as a readiness check for the room named by the user.\n"
                 "\n"
                 "Required steps:\n"
@@ -329,12 +329,12 @@ def default_prompt_macros() -> List[PromptMacro]:
         PromptMacro(
             id=MEETING_PREP_PROMPT_MACRO_ID,
             name="Prepare Meeting",
-            description=(
+            when_to_use=(
                 "Use when the user wants help preparing, planning, briefing for, or getting ready for a meeting. "
                 'Examples: "prepare my meeting", "help me prepare for my next meeting", "meeting prep", '
                 '"brief me for the meeting with Sarah".'
             ),
-            instructions=(
+            what_to_do=(
                 "Interpret the request as a meeting preparation workflow, not as a request for generic meeting advice.\n"
                 "\n"
                 "Required steps:\n"

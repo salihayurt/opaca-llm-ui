@@ -38,8 +38,8 @@ Prompt macros are user-defined task instructions exposed through the LoadPromptM
 If the current user request clearly matches one of the prompt macros listed in that tool's description,
 load the macro before answering or before choosing other tools. After LoadPromptMacro returns, follow
 the returned macro instructions for the rest of the current request while still respecting higher-priority
-system rules, denied tools, and confirmation requirements. If a macro asks for exact final wording,
-output exactly that wording without adding a tool summary. Do not load a prompt macro if no listed macro is relevant.
+system rules. If a macro asks for exact final wording, output exactly that wording without adding a tool summary. 
+Do not load a prompt macro if no listed macro is relevant.
 """
 
 

@@ -37,6 +37,7 @@ class PromptMacroTools:
                 f"  Name: {macro.name}\n"
                 f"  When to use: {macro.description}"
             )
+        macros_text = "\n".join(macro_lines)
 
         return dedent(f"""
             Load detailed instructions for a user-defined prompt macro.
@@ -45,7 +46,7 @@ class PromptMacroTools:
             Do not call this tool if none of the macros are relevant.
 
             Available prompt macros:
-            {chr(10).join(macro_lines)}
+            {macros_text}
 
             Pass the exact macro_id of the matching macro.
         """).strip()
