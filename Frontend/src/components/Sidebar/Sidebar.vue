@@ -275,7 +275,13 @@ export default {
             if (this.isAuthenticated) {
                 await this.logout({ logoutParams: { returnTo: window.location.origin } });
             } else {
-                await this.loginWithPopup({authorizationParams: {screen_hint: 'signup'}})
+                try {
+                    await this.loginWithPopup({authorizationParams: {screen_hint: 'signup'}})
+                } catch (error) {
+                    // Only show an error in the console, if the popup was not closed
+                    if (error.error === 'cancelled') return;
+                    console.error("Auth0 login failed: ", error)
+                }
             }
             // Update the sidebar information to reflect the new user state
             await this.updateSidebarUserInfo();
