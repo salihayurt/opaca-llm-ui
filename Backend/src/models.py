@@ -287,7 +287,7 @@ class PromptCategory(BaseModel):
 
 
 class PromptMacro(BaseModel):
-    id: str
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str
     when_to_use: str
     what_to_do: str

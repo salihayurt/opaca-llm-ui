@@ -35,7 +35,7 @@
             <span class="macro-actions">
                 <i class="fa fa-lg macro-action"
                    :class="macro.enabled ? 'fa-toggle-on' : 'fa-toggle-off'"
-                   @click.stop="toggleMacro(macro)"
+                   @click.stop="toggleMacro(macro.id)"
                    :title="Localizer.get(macro.enabled ? 'promptMacros_disable' : 'promptMacros_enable')" />
                 <i class="fa fa-remove macro-action"
                    @click.stop="deleteMacro(macro)"
@@ -131,18 +131,16 @@ export default {
                     },
                 },
                 async values => {
-                    const macro = {
-                        id: this.createMacroId(values.name),
+                    const macroData = {
                         name: values.name.trim(),
                         when_to_use: values.when_to_use.trim(),
                         what_to_do: values.what_to_do.trim(),
-                        enabled: true,
                     };
                     this.isSaving = true;
                     this.errorMessage = "";
                     try {
-                        await backendClient.savePromptMacro(macro);
-                        this.promptMacros.push(macro);
+                        const createdMacro = await backendClient.savePromptMacro(macroData);
+                        this.promptMacros.push(createdMacro);
                     } catch (error) {
                         console.error("Failed to save prompt macro", error);
                         this.errorMessage = Localizer.get("promptMacros_saveFailed");
@@ -154,22 +152,18 @@ export default {
             );
         },
 
-        createMacroId(name) {
-            const slug = name.toLowerCase()
-                .trim()
-                .replace(/[^a-z0-9]+/g, "_")
-                .replace(/^_+|_+$/g, "") || "prompt_macro";
-            return `${slug}_${Date.now().toString(36)}`;
-        },
-
-        async toggleMacro(macro) {
+        async toggleMacro(macroId) {
             if (this.isSaving) return;
+            const macroIndex = this.promptMacros.findIndex(macro => macro.id === macroId);
+            if (macroIndex < 0) return;
+
+            const macro = this.promptMacros[macroIndex];
             const enabled = !macro.enabled;
             this.isSaving = true;
             this.errorMessage = "";
             try {
-                await backendClient.setPromptMacroEnabled(macro, enabled);
-                macro.enabled = enabled;
+                const updatedMacro = await backendClient.setPromptMacroEnabled(macro, enabled);
+                this.promptMacros[macroIndex] = updatedMacro;
             } catch (error) {
                 console.error("Failed to update prompt macro", error);
                 this.errorMessage = Localizer.get("promptMacros_saveFailed");

@@ -563,8 +563,9 @@ async def get_prompt_macros(session: SessionData = Depends(handle_session_http))
 
 
 @app.post("/prompt-macros", description="Add or update a prompt macro for the current session.", tags=["prompt macros"])
-async def post_prompt_macro(data: PromptMacro, session: SessionData = Depends(handle_session_http)) -> None:
+async def post_prompt_macro(data: PromptMacro, session: SessionData = Depends(handle_session_http)) -> PromptMacro:
     session.set_prompt_macro(data)
+    return data
 
 
 @app.delete("/prompt-macros/{macro_id}", description="Delete a prompt macro from the current session.", tags=["prompt macros"])

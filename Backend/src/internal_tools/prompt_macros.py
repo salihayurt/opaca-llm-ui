@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import uuid
 from textwrap import dedent
 
 from ..models import InternalTool, PromptMacro
@@ -8,7 +7,7 @@ from .context import InternalToolContext
 
 
 class PromptMacroTools:
-    GROUP_NAME = "Prompt Macros"
+    GROUP_NAME = "PromptMacros"
 
     def __init__(self, ctx: InternalToolContext):
         self.ctx = ctx
@@ -82,7 +81,6 @@ class PromptMacroTools:
             raise ValueError("Prompt macro name, usage description, and instructions must not be empty.")
 
         prompt_macro = PromptMacro(
-            id=str(uuid.uuid4()),
             **values,
         )
         self.ctx.session.set_prompt_macro(prompt_macro)

@@ -199,11 +199,11 @@ class BackendClient {
         return await this.sendRequest("GET", "prompt-macros");
     }
 
-    async savePromptMacro(promptMacro: PromptMacro): Promise<void> {
+    async savePromptMacro(promptMacro: PromptMacro | Omit<PromptMacro, "id" | "enabled">): Promise<PromptMacro> {
         return await this.sendRequest("POST", "prompt-macros", promptMacro);
     }
 
-    async setPromptMacroEnabled(promptMacro: PromptMacro, enabled: boolean): Promise<void> {
+    async setPromptMacroEnabled(promptMacro: PromptMacro, enabled: boolean): Promise<PromptMacro> {
         return await this.savePromptMacro({...promptMacro, enabled});
     }
 
