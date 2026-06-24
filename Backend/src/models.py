@@ -362,7 +362,7 @@ class MCPTool(BaseModel):
 
 class MCPServer(BaseModel):
     server_url: str
-    server_label: str | None = None
+    server_label: str
     type: str | None = None
     tools: Dict[str, MCPTool] = Field(default_factory=dict)
     
