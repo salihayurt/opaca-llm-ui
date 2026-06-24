@@ -294,65 +294,6 @@ class PromptMacro(BaseModel):
     enabled: bool = True
 
 
-ROOM_READINESS_PROMPT_MACRO_ID = "room_readiness_check"
-MEETING_PREP_PROMPT_MACRO_ID = "meeting_prep_briefing"
-
-
-def default_prompt_macros() -> List[PromptMacro]:
-    return [
-        PromptMacro(
-            id=ROOM_READINESS_PROMPT_MACRO_ID,
-            name="Room Readiness Check",
-            when_to_use=(
-                "Use when the user asks whether a room is ready, usable, okay, free, suitable, or prepared "
-                'for a meeting or work session. Examples: "is the conference room ready?", '
-                '"is Focus Space okay for a meeting?".'
-            ),
-            what_to_do=(
-                "Interpret the request as a readiness check for the room named by the user.\n"
-                "\n"
-                "Required steps:\n"
-                "1. Resolve the room name or room id if needed using the available room lookup tools.\n"
-                "2. Check current room availability using roombooking-agent if available, or the closest "
-                "equivalent room booking action such as RoomAgent CheckAvailability.\n"
-                "3. Get current environmental readings for that same room, especially temperature and CO2, "
-                "using home-assistant-agent from reallabor-proxy if available, or the closest equivalent "
-                "sensor action such as SensorAgent GetCompleteInfo, GetTemperature, and GetCo2Level.\n"
-                "\n"
-                "Output rule:\n"
-                "- Answer with a compact readiness verdict: Ready, Not ready, or Unknown.\n"
-                "- Include only availability, temperature, and CO2, plus any important tool failure.\n"
-                "- Do not book the room unless the user explicitly asks you to book it.\n"
-                "- If a needed tool or reading is unavailable, say which part could not be checked."
-            ),
-        ),
-        PromptMacro(
-            id=MEETING_PREP_PROMPT_MACRO_ID,
-            name="Prepare Meeting",
-            when_to_use=(
-                "Use when the user wants help preparing, planning, briefing for, or getting ready for a meeting. "
-                'Examples: "prepare my meeting", "help me prepare for my next meeting", "meeting prep", '
-                '"brief me for the meeting with Sarah".'
-            ),
-            what_to_do=(
-                "Interpret the request as a meeting preparation workflow, not as a request for generic meeting advice.\n"
-                "\n"
-                "Required steps:\n"
-                "1. Use the available calendar, scheduling, email, or meeting tools to identify the relevant "
-                "meeting details: title, time, topic or agenda, location, and attendees.\n"
-                "2. For each named attendee, use available contact, directory, profile, web search, or LinkedIn "
-                "profile tools to gather professional background and role-relevant context.\n"
-                "\n"
-                "Output rule:\n"
-                "- Produce a concise briefing with these sections: Purpose, Attendees, Key Insights, Suggested "
-                "Talking Points, Open Questions.\n"
-                "- Include only facts supported by tool results, and mark missing information as unavailable.\n"
-                "- Do not include raw profile dumps, unrelated biographical details, or speculation."
-            ),
-        )
-    ]
-
-
 class Chat(BaseModel):
     """
     Stores information about each chat.
@@ -477,7 +418,7 @@ class SessionData(BaseModel):
     opaca_approvals: Dict[str, Dict[str, ToolApprovalState]] = Field(default_factory=dict)
     blocked: bool = False
     prompts: SessionPrompts | None = None
-    prompt_macros: List[PromptMacro] = Field(default_factory=default_prompt_macros)
+    prompt_macros: List[PromptMacro] = Field(default_factory=list)
     is_notifs_aborted: bool = False
 
     _websocket: WebSocket | None = PrivateAttr(default=None)
@@ -491,22 +432,13 @@ class SessionData(BaseModel):
         task_ids = [self.last_scheduled_task_id]
         task_ids.extend(int(task_id) for task_id in self.scheduled_tasks)
         self.last_scheduled_task_id = max(task_ids)
-        self.ensure_default_prompt_macros()
         return self
 
     def create_scheduled_task_id(self) -> int:
         self.last_scheduled_task_id += 1
         return self.last_scheduled_task_id
 
-    def ensure_default_prompt_macros(self) -> None:
-        macro_ids = {macro.id for macro in self.prompt_macros}
-        for macro in default_prompt_macros():
-            if macro.id not in macro_ids:
-                self.prompt_macros.append(macro)
-                macro_ids.add(macro.id)
-
     def enabled_prompt_macros(self) -> List[PromptMacro]:
-        self.ensure_default_prompt_macros()
         return [macro for macro in self.prompt_macros if macro.enabled]
 
     @property
