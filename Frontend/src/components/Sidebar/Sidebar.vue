@@ -44,10 +44,10 @@
                    :title="Localizer.get('sidebar_agents')"
                    v-bind:class="{'sidebar-menu-item-select': SidebarManager.isViewSelected('agents')}"/>
 
-                <i @click="SidebarManager.toggleView('promptMacros')"
+                <i @click="SidebarManager.toggleView('playBooks')"
                    class="fa fa-cubes-stacked sidebar-menu-item"
-                   :title="Localizer.get('sidebar_promptMacros')"
-                   v-bind:class="{'sidebar-menu-item-select': SidebarManager.isViewSelected('promptMacros')}"/>
+                   :title="Localizer.get('sidebar_playBooks')"
+                   v-bind:class="{'sidebar-menu-item-select': SidebarManager.isViewSelected('playBooks')}"/>
 
                 <i @click="SidebarManager.toggleView('extensions')"
                    class="fa fa-puzzle-piece sidebar-menu-item"
@@ -134,11 +134,11 @@
                     ref="agents"
                 />
 
-                <!-- prompt macros -->
-                <SidebarPromptMacros
-                    v-show="SidebarManager.isViewSelected('promptMacros')"
+                <!-- play books -->
+                <SidebarPlayBooks
+                    v-show="SidebarManager.isViewSelected('playBooks')"
                     :sidebar-view="SidebarManager.getSelectedView()"
-                    ref="promptMacros"
+                    ref="playBooks"
                 />
 
                 <!-- UI extensions -->
@@ -194,7 +194,7 @@ import SidebarFaq from "./SidebarFaq.vue";
 import SidebarChats from "./SidebarChats.vue";
 import SidebarFiles from "./SidebarFiles.vue";
 import SidebarMcp from "./SidebarMcp.vue";
-import SidebarPromptMacros from "./SidebarPromptMacros.vue";
+import SidebarPlayBooks from "./SidebarPlayBooks.vue";
 import backendClient from "../../utils.js";
 
 export default {
@@ -208,7 +208,7 @@ export default {
         SidebarInfo,
         SidebarConfig,
         SidebarAgents,
-        SidebarPromptMacros,
+        SidebarPlayBooks,
         SidebarExtensions,
         SidebarQuestions,
     },

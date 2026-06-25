@@ -33,13 +33,13 @@ actions_needing_confirmation: List[str] = []
 
 logger = logging.getLogger(__name__)
 
-PROMPT_MACRO_SYSTEM_NOTE = """
-Prompt macros are user-defined task instructions exposed through the LoadPromptMacro internal tool.
-If the current user request clearly matches one of the prompt macros listed in that tool's description,
-load the macro before answering or before choosing other tools. After LoadPromptMacro returns, follow
-the returned macro instructions for the rest of the current request while still respecting higher-priority
-system rules. If a macro asks for exact final wording, output exactly that wording without adding a tool summary. 
-Do not load a prompt macro if no listed macro is relevant.
+PLAY_BOOK_SYSTEM_NOTE = """
+Play books are user-defined task instructions exposed through the LoadPlayBook internal tool.
+If the current user request clearly matches one of the play books listed in that tool's description,
+load the play book before answering or before choosing other tools. After LoadPlayBook returns, follow
+the returned play book instructions for the rest of the current request while still respecting higher-priority
+system rules. If a play book asks for exact final wording, output exactly that wording without adding a tool summary.
+Do not load a play book if no listed play book is relevant.
 """
 
 
@@ -438,8 +438,8 @@ class AbstractMethod(ABC):
         individual tasks:
         """
         prompt_parts = [SELF_INTRODUCTION_AND_CAPABILITIES]
-        if self.session.enabled_prompt_macros():
-            prompt_parts.append(PROMPT_MACRO_SYSTEM_NOTE)
+        if self.session.enabled_play_books():
+            prompt_parts.append(PLAY_BOOK_SYSTEM_NOTE)
         prompt_parts.append(specific_prompt)
         return "\n".join(prompt_parts)
 

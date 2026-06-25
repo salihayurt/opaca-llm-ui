@@ -129,7 +129,7 @@ export interface PromptCategory {
 
 export type SessionPrompts = Record<string, PromptCategory[]>;
 
-export interface PromptMacro {
+export interface PlayBook {
     id: string;
     name: string;
     when_to_use: string;

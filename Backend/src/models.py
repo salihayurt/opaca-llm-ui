@@ -291,7 +291,7 @@ class PromptCategory(BaseModel):
     questions: List[Prompt] = []
 
 
-class PromptMacro(BaseModel):
+class PlayBook(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str
     when_to_use: str
@@ -392,7 +392,7 @@ class SessionData(BaseModel):
         mcp_servers: All added mcp server information in JSON format.
         blocked: Whether this session is currently blocked, not accepting any requests.
         prompts: Prompt Library data.
-        prompt_macros: User-defined prompt macros exposed through internal tools.
+        play_books: User-defined play books exposed through internal tools.
         is_notifs_aborted: Boolean indicating if all current notification generations should be aborted.
     Transient fields:
         _websocket: Can be used to send intermediate result and other messages back to the UI
@@ -418,7 +418,7 @@ class SessionData(BaseModel):
     opaca_approvals: Dict[str, Dict[str, ToolApprovalState]] = Field(default_factory=dict)
     blocked: bool = False
     prompts: SessionPrompts | None = None
-    prompt_macros: List[PromptMacro] = Field(default_factory=list)
+    play_books: List[PlayBook] = Field(default_factory=list)
     is_notifs_aborted: bool = False
 
     _websocket: WebSocket | None = PrivateAttr(default=None)
@@ -438,20 +438,20 @@ class SessionData(BaseModel):
         self.last_scheduled_task_id += 1
         return self.last_scheduled_task_id
 
-    def enabled_prompt_macros(self) -> List[PromptMacro]:
-        return [macro for macro in self.prompt_macros if macro.enabled]
+    def enabled_play_books(self) -> List[PlayBook]:
+        return [play_book for play_book in self.play_books if play_book.enabled]
 
-    def set_prompt_macro(self, prompt_macro: PromptMacro) -> None:
-        for index, current_macro in enumerate(self.prompt_macros):
-            if current_macro.id == prompt_macro.id:
-                self.prompt_macros[index] = prompt_macro
+    def set_play_book(self, play_book: PlayBook) -> None:
+        for index, current_play_book in enumerate(self.play_books):
+            if current_play_book.id == play_book.id:
+                self.play_books[index] = play_book
                 return
-        self.prompt_macros.append(prompt_macro)
+        self.play_books.append(play_book)
 
-    def delete_prompt_macro(self, macro_id: str) -> bool:
-        for index, prompt_macro in enumerate(self.prompt_macros):
-            if prompt_macro.id == macro_id:
-                self.prompt_macros.pop(index)
+    def delete_play_book(self, play_book_id: str) -> bool:
+        for index, play_book in enumerate(self.play_books):
+            if play_book.id == play_book_id:
+                self.play_books.pop(index)
                 return True
         return False
 

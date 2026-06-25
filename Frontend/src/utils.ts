@@ -19,7 +19,7 @@ import type {
     ToolApprovalState,
     MCPTool,
     MCPCreateRequest,
-    PromptMacro,
+    PlayBook,
 } from "./models";
 
 class BackendClient {
@@ -193,22 +193,22 @@ class BackendClient {
         return await this.sendRequest("DELETE", "prompts");
     }
 
-    // prompt macros
+    // play books
 
-    async getPromptMacros(): Promise<PromptMacro[]> {
-        return await this.sendRequest("GET", "prompt-macros");
+    async getPlayBooks(): Promise<PlayBook[]> {
+        return await this.sendRequest("GET", "play-books");
     }
 
-    async savePromptMacro(promptMacro: PromptMacro | Omit<PromptMacro, "id" | "enabled">): Promise<PromptMacro> {
-        return await this.sendRequest("POST", "prompt-macros", promptMacro);
+    async savePlayBook(playBook: PlayBook | Omit<PlayBook, "id" | "enabled">): Promise<PlayBook> {
+        return await this.sendRequest("POST", "play-books", playBook);
     }
 
-    async setPromptMacroEnabled(promptMacro: PromptMacro, enabled: boolean): Promise<PromptMacro> {
-        return await this.savePromptMacro({...promptMacro, enabled});
+    async setPlayBookEnabled(playBook: PlayBook, enabled: boolean): Promise<PlayBook> {
+        return await this.savePlayBook({...playBook, enabled});
     }
 
-    async deletePromptMacro(macroId: string): Promise<void> {
-        return await this.sendRequest("DELETE", `prompt-macros/${encodeURIComponent(macroId)}`);
+    async deletePlayBook(playBookId: string): Promise<void> {
+        return await this.sendRequest("DELETE", `play-books/${encodeURIComponent(playBookId)}`);
     }
 
     async getContainerApprovals(containerId: string): Promise<Record<string, ToolApprovalState>> {

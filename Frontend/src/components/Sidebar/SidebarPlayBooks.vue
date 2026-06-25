@@ -1,58 +1,58 @@
 <template>
 <div class="container flex-grow-1 overflow-hidden overflow-y-auto">
     <div v-if="!isMobile" class="sidebar-title">
-        {{ Localizer.get('sidebar_promptMacros') }}
+        {{ Localizer.get('sidebar_playBooks') }}
     </div>
 
     <div v-if="isLoading">
         <i class="fa fa-circle-notch fa-spin me-1" />
-        {{ Localizer.get('promptMacros_loading') }}
+        {{ Localizer.get('playBooks_loading') }}
     </div>
 
     <div v-if="errorMessage" class="text-danger mb-2">
         {{ errorMessage }}
     </div>
 
-    <div v-if="!isLoading && !errorMessage && promptMacros.length === 0">
-        {{ Localizer.get('promptMacros_missing') }}
+    <div v-if="!isLoading && !errorMessage && playBooks.length === 0">
+        {{ Localizer.get('playBooks_missing') }}
     </div>
 
     <AppAccordion
-        v-if="!isLoading && promptMacros.length > 0"
-        id="prompt-macros-accordion"
+        v-if="!isLoading && playBooks.length > 0"
+        id="play-books-accordion"
         class="text-start"
-        :items="sortedPromptMacros"
-        :get-key="macro => macro.id"
+        :items="sortedPlayBooks"
+        :get-key="playBook => playBook.id"
     >
-        <template #header="{ item: macro }">
+        <template #header="{ item: playBook }">
             <i class="fa fa-cubes-stacked me-3"
-               :class="{ 'macro-disabled': !macro.enabled }" />
-            <strong class="macro-name"
-                    :class="{ 'macro-disabled': !macro.enabled }">
-                {{ macro.name }}
+               :class="{ 'play-book-disabled': !playBook.enabled }" />
+            <strong class="play-book-name"
+                    :class="{ 'play-book-disabled': !playBook.enabled }">
+                {{ playBook.name }}
             </strong>
 
-            <span class="macro-actions">
-                <i class="fa fa-lg macro-action"
-                   :class="macro.enabled ? 'fa-toggle-on' : 'fa-toggle-off'"
-                   @click.stop="toggleMacro(macro.id)"
-                   :title="Localizer.get(macro.enabled ? 'promptMacros_disable' : 'promptMacros_enable')" />
-                <i class="fa fa-remove macro-action"
-                   @click.stop="deleteMacro(macro)"
-                   :title="Localizer.get('promptMacros_delete')" />
+            <span class="play-book-actions">
+                <i class="fa fa-lg play-book-action"
+                   :class="playBook.enabled ? 'fa-toggle-on' : 'fa-toggle-off'"
+                   @click.stop="togglePlayBook(playBook.id)"
+                   :title="Localizer.get(playBook.enabled ? 'playBooks_disable' : 'playBooks_enable')" />
+                <i class="fa fa-remove play-book-action"
+                   @click.stop="deletePlayBook(playBook)"
+                   :title="Localizer.get('playBooks_delete')" />
             </span>
         </template>
 
-        <template #body="{ item: macro }">
-            <div class="macro-body"
-                 :class="{ 'macro-disabled': !macro.enabled }">
-                <div class="macro-section">
-                    <strong>{{ Localizer.get('promptMacros_whenToUse') }}</strong>
-                    <p>{{ macro.when_to_use }}</p>
+        <template #body="{ item: playBook }">
+            <div class="play-book-body"
+                 :class="{ 'play-book-disabled': !playBook.enabled }">
+                <div class="play-book-section">
+                    <strong>{{ Localizer.get('playBooks_whenToUse') }}</strong>
+                    <p>{{ playBook.when_to_use }}</p>
                 </div>
-                <div class="macro-section">
-                    <strong>{{ Localizer.get('promptMacros_whatToDo') }}</strong>
-                    <p class="macro-instructions">{{ macro.what_to_do }}</p>
+                <div class="play-book-section">
+                    <strong>{{ Localizer.get('playBooks_whatToDo') }}</strong>
+                    <p class="play-book-instructions">{{ playBook.what_to_do }}</p>
                 </div>
             </div>
         </template>
@@ -61,9 +61,9 @@
     <button type="button"
             class="btn btn-primary py-2 w-100"
             :disabled="isSaving"
-            @click.stop="addPromptMacro">
+            @click.stop="addPlayBook">
         <i class="fa fa-plus me-2" />
-        {{ Localizer.get('promptMacros_add') }}
+        {{ Localizer.get('playBooks_add') }}
     </button>
 
     <InputDialogue ref="input" />
@@ -78,7 +78,7 @@ import backendClient from "../../utils.js";
 import { useDevice } from "../../useIsMobile.js";
 
 export default {
-    name: "SidebarPromptMacros",
+    name: "SidebarPlayBooks",
     components: { AppAccordion, InputDialogue },
     props: {
         sidebarView: String,
@@ -89,49 +89,49 @@ export default {
     },
     data() {
         return {
-            promptMacros: [],
+            playBooks: [],
             isLoading: false,
             isSaving: false,
             errorMessage: "",
         };
     },
     methods: {
-        async loadPromptMacros() {
+        async loadPlayBooks() {
             this.isLoading = true;
             this.errorMessage = "";
             try {
-                this.promptMacros = await backendClient.getPromptMacros();
+                this.playBooks = await backendClient.getPlayBooks();
             } catch (error) {
-                console.error("Failed to load prompt macros", error);
-                this.errorMessage = Localizer.get("promptMacros_loadFailed");
+                console.error("Failed to load play books", error);
+                this.errorMessage = Localizer.get("playBooks_loadFailed");
             } finally {
                 this.isLoading = false;
             }
         },
 
-        async addPromptMacro() {
+        async addPlayBook() {
             await this.$refs.input.showDialogue(
-                Localizer.get("promptMacros_add"),
+                Localizer.get("playBooks_add"),
                 null,
                 null,
                 {
                     name: {
                         type: "text",
-                        label: Localizer.get("promptMacros_name"),
+                        label: Localizer.get("playBooks_name"),
                     },
                     when_to_use: {
                         type: "textarea",
-                        label: Localizer.get("promptMacros_whenToUse"),
+                        label: Localizer.get("playBooks_whenToUse"),
                         rows: 4,
                     },
                     what_to_do: {
                         type: "textarea",
-                        label: Localizer.get("promptMacros_whatToDo"),
+                        label: Localizer.get("playBooks_whatToDo"),
                         rows: 7,
                     },
                 },
                 async values => {
-                    const macroData = {
+                    const playBookData = {
                         name: values.name.trim(),
                         when_to_use: values.when_to_use.trim(),
                         what_to_do: values.what_to_do.trim(),
@@ -139,12 +139,12 @@ export default {
                     this.isSaving = true;
                     this.errorMessage = "";
                     try {
-                        const createdMacro = await backendClient.savePromptMacro(macroData);
-                        this.promptMacros.push(createdMacro);
+                        const createdPlayBook = await backendClient.savePlayBook(playBookData);
+                        this.playBooks.push(createdPlayBook);
                     } catch (error) {
-                        console.error("Failed to save prompt macro", error);
-                        this.errorMessage = Localizer.get("promptMacros_saveFailed");
-                        throw new Error(Localizer.get("promptMacros_saveFailed"));
+                        console.error("Failed to save play book", error);
+                        this.errorMessage = Localizer.get("playBooks_saveFailed");
+                        throw new Error(Localizer.get("playBooks_saveFailed"));
                     } finally {
                         this.isSaving = false;
                     }
@@ -152,43 +152,43 @@ export default {
             );
         },
 
-        async toggleMacro(macroId) {
+        async togglePlayBook(playBookId) {
             if (this.isSaving) return;
-            const macroIndex = this.promptMacros.findIndex(macro => macro.id === macroId);
-            if (macroIndex < 0) return;
+            const playBookIndex = this.playBooks.findIndex(playBook => playBook.id === playBookId);
+            if (playBookIndex < 0) return;
 
-            const macro = this.promptMacros[macroIndex];
-            const enabled = !macro.enabled;
+            const playBook = this.playBooks[playBookIndex];
+            const enabled = !playBook.enabled;
             this.isSaving = true;
             this.errorMessage = "";
             try {
-                const updatedMacro = await backendClient.setPromptMacroEnabled(macro, enabled);
-                this.promptMacros[macroIndex] = updatedMacro;
+                const updatedPlayBook = await backendClient.setPlayBookEnabled(playBook, enabled);
+                this.playBooks[playBookIndex] = updatedPlayBook;
             } catch (error) {
-                console.error("Failed to update prompt macro", error);
-                this.errorMessage = Localizer.get("promptMacros_saveFailed");
+                console.error("Failed to update play book", error);
+                this.errorMessage = Localizer.get("playBooks_saveFailed");
             } finally {
                 this.isSaving = false;
             }
         },
 
-        async deleteMacro(macro) {
+        async deletePlayBook(playBook) {
             if (this.isSaving) return;
             await this.$refs.input.showDialogue(
-                Localizer.get("promptMacros_delete"),
-                Localizer.get("promptMacros_delete_confirm", macro.name),
+                Localizer.get("playBooks_delete"),
+                Localizer.get("playBooks_delete_confirm", playBook.name),
                 null,
                 {},
                 async () => {
                     this.isSaving = true;
                     this.errorMessage = "";
                     try {
-                        await backendClient.deletePromptMacro(macro.id);
-                        this.promptMacros = this.promptMacros.filter(item => item.id !== macro.id);
+                        await backendClient.deletePlayBook(playBook.id);
+                        this.playBooks = this.playBooks.filter(item => item.id !== playBook.id);
                     } catch (error) {
-                        console.error("Failed to delete prompt macro", error);
-                        this.errorMessage = Localizer.get("promptMacros_deleteFailed");
-                        throw new Error(Localizer.get("promptMacros_deleteFailed"));
+                        console.error("Failed to delete play book", error);
+                        this.errorMessage = Localizer.get("playBooks_deleteFailed");
+                        throw new Error(Localizer.get("playBooks_deleteFailed"));
                     } finally {
                         this.isSaving = false;
                     }
@@ -197,15 +197,15 @@ export default {
         },
     },
     computed: {
-        sortedPromptMacros() {
-            return [...this.promptMacros]
+        sortedPlayBooks() {
+            return [...this.playBooks]
                 .sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
         },
     },
     watch: {
         sidebarView(newView) {
-            if (newView === "promptMacros") {
-                this.loadPromptMacros();
+            if (newView === "playBooks") {
+                this.loadPlayBooks();
             }
         },
     },
@@ -213,7 +213,7 @@ export default {
 </script>
 
 <style scoped>
-.macro-name {
+.play-book-name {
     flex: 1 1 auto;
     min-width: 0;
     overflow: hidden;
@@ -221,13 +221,13 @@ export default {
     white-space: nowrap;
 }
 
-.macro-actions {
+.play-book-actions {
     flex: 0 0 auto;
     display: inline-flex;
     align-items: center;
 }
 
-.macro-action {
+.play-book-action {
     flex: 0 0 auto;
     width: 2rem;
     height: 2rem;
@@ -239,7 +239,7 @@ export default {
     margin-right: 0 !important;
 }
 
-.macro-action:hover {
+.play-book-action:hover {
     background-color: var(--input-color);
 }
 
@@ -255,24 +255,24 @@ export default {
     color: var(--text-danger-color);
 }
 
-.macro-disabled {
+.play-book-disabled {
     opacity: 0.5;
 }
 
-.macro-body {
+.play-book-body {
     padding: 0.75rem;
 }
 
-.macro-section + .macro-section {
+.play-book-section + .play-book-section {
     margin-top: 1rem;
 }
 
-.macro-section p {
+.play-book-section p {
     margin: 0.25rem 0 0;
     overflow-wrap: anywhere;
 }
 
-.macro-instructions {
+.play-book-instructions {
     white-space: pre-wrap;
 }
 </style>
