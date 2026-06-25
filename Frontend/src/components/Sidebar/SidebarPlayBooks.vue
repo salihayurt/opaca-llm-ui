@@ -25,7 +25,7 @@
         :get-key="playBook => playBook.id"
     >
         <template #header="{ item: playBook }">
-            <i class="fa fa-cubes-stacked me-3"
+            <i class="fa fa-clipboard-check me-3"
                :class="{ 'play-book-disabled': !playBook.enabled }" />
             <strong class="play-book-name"
                     :class="{ 'play-book-disabled': !playBook.enabled }">

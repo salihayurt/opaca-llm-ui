@@ -45,7 +45,7 @@
                    v-bind:class="{'sidebar-menu-item-select': SidebarManager.isViewSelected('agents')}"/>
 
                 <i @click="SidebarManager.toggleView('playBooks')"
-                   class="fa fa-cubes-stacked sidebar-menu-item"
+                   class="fa fa-clipboard-check sidebar-menu-item"
                    :title="Localizer.get('sidebar_playBooks')"
                    v-bind:class="{'sidebar-menu-item-select': SidebarManager.isViewSelected('playBooks')}"/>
 
