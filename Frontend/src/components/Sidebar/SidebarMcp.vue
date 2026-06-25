@@ -54,7 +54,7 @@
 
                     <template #body="{ item: mcp, index: mcpIndex }">
                         <div class="mcp-body">
-                            <p class="invoke" @click.stop="invokeAction(mcp.server_label, mcp.name, mcp.inputSchema.properties)">
+                            <p class="invoke" @click.stop="invokeAction(mcp.server_label, mcp.name, mcpToOpacaSchema(mcp.inputSchema))">
                                 <strong>{{ Localizer.get('agents_invoke') }}</strong>
                                 <i class="fa fa-circle-play mx-2"/>
                             </p>
@@ -305,6 +305,14 @@ export default {
             } else {
                 return json.type;
             }
+        },
+
+        mcpToOpacaSchema(inputSchema) {
+            const res = { ...inputSchema.properties };
+            for (const key of inputSchema.required ?? []) {
+                res[key].required = true;
+            }
+            return res;
         },
     },
 
