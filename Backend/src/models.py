@@ -118,7 +118,7 @@ class MCPCreateRequest(BaseModel):
 
 class ToolApprovalUpdateRequest(BaseModel):
     """Used as payload for updating the approval status of a tool.
-    
+
     Attributes:
         tool_name: the full name of the tool for which the approval status should be updated
         approval: the new approval status
@@ -291,6 +291,14 @@ class PromptCategory(BaseModel):
     questions: List[Prompt] = []
 
 
+class PlayBook(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    when_to_use: str
+    what_to_do: str
+    enabled: bool = True
+
+
 class Chat(BaseModel):
     """
     Stores information about each chat.
@@ -365,7 +373,7 @@ class MCPServer(BaseModel):
     server_label: str
     type: str | None = None
     tools: Dict[str, MCPTool] = Field(default_factory=dict)
-    
+
 
 class SessionData(BaseModel):
     """
@@ -384,6 +392,7 @@ class SessionData(BaseModel):
         mcp_servers: All added mcp server information in JSON format.
         blocked: Whether this session is currently blocked, not accepting any requests.
         prompts: Prompt Library data.
+        play_books: User-defined play books exposed through internal tools.
         is_notifs_aborted: Boolean indicating if all current notification generations should be aborted.
     Transient fields:
         _websocket: Can be used to send intermediate result and other messages back to the UI
@@ -409,6 +418,7 @@ class SessionData(BaseModel):
     opaca_approvals: Dict[str, Dict[str, ToolApprovalState]] = Field(default_factory=dict)
     blocked: bool = False
     prompts: SessionPrompts | None = None
+    play_books: List[PlayBook] = Field(default_factory=list)
     is_notifs_aborted: bool = False
 
     _websocket: WebSocket | None = PrivateAttr(default=None)
@@ -427,6 +437,23 @@ class SessionData(BaseModel):
     def create_scheduled_task_id(self) -> int:
         self.last_scheduled_task_id += 1
         return self.last_scheduled_task_id
+
+    def enabled_play_books(self) -> List[PlayBook]:
+        return [play_book for play_book in self.play_books if play_book.enabled]
+
+    def set_play_book(self, play_book: PlayBook) -> None:
+        for index, current_play_book in enumerate(self.play_books):
+            if current_play_book.id == play_book.id:
+                self.play_books[index] = play_book
+                return
+        self.play_books.append(play_book)
+
+    def delete_play_book(self, play_book_id: str) -> bool:
+        for index, play_book in enumerate(self.play_books):
+            if play_book.id == play_book_id:
+                self.play_books.pop(index)
+                return True
+        return False
 
     @property
     def opaca_client(self) -> OpacaClient:
@@ -837,7 +864,7 @@ class LLMConfig(BaseModel):
         filtered = self._filter_supported(self.parameters.model_dump())
         self.parameters = LLMParameters(**filtered)
         return self
-    
+
     def _filter_supported(self, params: dict) -> dict:
         """Remove unsupported parameters from config schema."""
         supported = get_supported_openai_params(self.model)
