@@ -19,50 +19,40 @@
             <iframe :src="this.maximized" class="extension-expand-window" @click.stop />
         </div>
 
-        <div class="accordion text-start" id="containers-accordion">
-            <div v-for="(container, containerIndex) in this.extraPorts" class="accordion-item" :key="containerIndex">
+        <AppAccordion
+            id="containers-accordion"
+            class="text-start"
+            :items="this.extraPorts"
+            :get-key="getContainerKey"
+        >
+            <template #header="{ item: container }">
+                <i class="fa fa-puzzle-piece me-3"/>
+                <strong>{{ container.container }}</strong>
+            </template>
 
-                <!-- header -->
-                <h2 class="accordion-header m-0" :id="'accordion-header-' + containerIndex">
-                    <button class="accordion-button collapsed"
-                            type="button" data-bs-toggle="collapse"
-                            :data-bs-target="'#accordion-body-' + containerIndex"
-                            aria-expanded="false"
-                            :aria-controls="'accordion-body-' + containerIndex">
-                        <i class="fa fa-puzzle-piece me-3"/>
-                        <strong>{{ container.container }}</strong>
-                    </button>
-                </h2>
+            <template #body="{ item: container, index: containerIndex }">
+                <AppAccordion
+                    :id="`extensions-accordion-${containerIndex}`"
+                    :items="container.extraPorts"
+                    :get-key="getExtensionKey"
+                    variant="nested"
+                >
+                    <template #header="{ item: extension }">
+                        {{ extension.description }}
+                        <i class="fa fa-expand extension-expand-button"
+                            @click.stop="this.maximized = extension.fullUrl"
+                            :title="Localizer.get('extensions_expand')"
+                        />
+                    </template>
 
-                <!-- body -->
-                <div :id="'accordion-body-' + containerIndex" class="accordion-collapse collapse"
-                     :aria-labelledby="'accordion-header-' + containerIndex" :data-bs-parent="'#containers-accordion'">
-                    <div class="list-group list-group-flush" :id="'extensions-accordion-' + containerIndex">
-                        <div v-for="(extension, extensionIndex) in container.extraPorts" :key="extensionIndex" class="list-group-item">
-
-                            <!-- header -->
-                            <button class="extension-header-button collapsed"
-                                    type="button" data-bs-toggle="collapse"
-                                    :data-bs-target="'#extension-body-' + containerIndex + '-' + extensionIndex"
-                                    aria-expanded="false"
-                                    :aria-controls="'extension-body-' + containerIndex + '-' + extensionIndex">
-                                {{ extension.description }}
-                                <i class="fa fa-expand extension-expand-button"
-                                    @click.stop="this.maximized = extension.fullUrl"
-                                    :title="Localizer.get('extensions_expand')"
-                                />
-                            </button>
-
-                            <!-- extension body -->
-                            <div :id="'extension-body-' + containerIndex + '-' + extensionIndex" class="accordion-collapse collapse extension-body"
-                                 :aria-labelledby="'extension-header-' + containerIndex + '-' + extensionIndex" :data-bs-parent="'#extensions-accordion-' + containerIndex">
-                                <iframe :src="extension.fullUrl" />
-                            </div>
+                    <template #body="{ item: extension }">
+                        <div class="extension-body">
+                            <iframe :src="extension.fullUrl" />
                         </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+                    </template>
+                </AppAccordion>
+            </template>
+        </AppAccordion>
     </div>
     <button type="button"
             class="btn btn-secondary py-2 w-100"
@@ -80,9 +70,11 @@
 import Localizer from "../../Localizer.js";
 import { useDevice } from "../../useIsMobile.js";
 import backendClient from "../../utils.js";
+import AppAccordion from '../AppAccordion.vue';
 
 export default {
     name: 'SidebarExtensions',
+    components: {AppAccordion},
     props: {
         isPlatformConnected: Boolean,
     },
@@ -98,6 +90,17 @@ export default {
         };
     },
     methods: {
+        getContainerKey(container, index) {
+            const urls = container.extraPorts
+                ?.map(extension => extension.fullUrl)
+                .join('|');
+            return `${container.container}-${urls || index}`;
+        },
+
+        getExtensionKey(extension, index) {
+            return extension.fullUrl ?? `${extension.description}-${index}`;
+        },
+
         async updatePlatformInfo() {
             this.isLoading = true;
             this.extraPorts = this.isPlatformConnected
@@ -116,25 +119,6 @@ export default {
 </script>
 
 <style scoped>
-.extension-header-button {
-    background-color: transparent;
-    color: inherit;
-    padding: 0 1rem;
-    border: none;
-    box-shadow: none;
-    text-align: left;
-    width: 100%;
-    font-weight: bold;
-}
-
-.extension-header-button:focus {
-    outline: none;
-}
-
-.extension-header-button::after {
-    display: none;
-}
-
 .extension-body {
     padding: 0.5rem 0;
 }

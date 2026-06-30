@@ -16,6 +16,10 @@ import type {
     PushMessage,
     DebugMessage,
     RestrictedActions,
+    ToolApprovalState,
+    MCPTool,
+    MCPCreateRequest,
+    PlayBook,
 } from "./models";
 import type {Ref} from "vue";
 
@@ -203,22 +207,40 @@ class BackendClient {
         return await this.sendRequest("DELETE", "prompts");
     }
 
-    async getContainerApprovals(containerId) {
+    // play books
+
+    async getPlayBooks(): Promise<PlayBook[]> {
+        return await this.sendRequest("GET", "play-books");
+    }
+
+    async savePlayBook(playBook: PlayBook | Omit<PlayBook, "id" | "enabled">): Promise<PlayBook> {
+        return await this.sendRequest("POST", "play-books", playBook);
+    }
+
+    async setPlayBookEnabled(playBook: PlayBook, enabled: boolean): Promise<PlayBook> {
+        return await this.savePlayBook({...playBook, enabled});
+    }
+
+    async deletePlayBook(playBookId: string): Promise<void> {
+        return await this.sendRequest("DELETE", `play-books/${encodeURIComponent(playBookId)}`);
+    }
+
+    async getContainerApprovals(containerId: string): Promise<Record<string, ToolApprovalState>> {
         return await this.sendRequest("GET", `containers/${containerId}/approval`);
     }
 
-    async setContainerApproval(containerId, toolName, approval) {
+    async setContainerApproval(containerId: string, toolName: string, approval: ToolApprovalState): Promise<void> {
         const body = {tool_name: toolName, approval: approval};
         return await this.sendRequest("PATCH", `containers/${containerId}/approval`, body);
     }
 
     // mcp
 
-    async getMCPs(): Promise<Record<string, any>> {
+    async getMCPs(): Promise<Record<string, MCPTool[]>> {
         return await this.sendRequest("GET", "mcp");
     }
 
-    async addMcp(mcp: any): Promise<void> {
+    async addMcp(mcp: MCPCreateRequest): Promise<void> {
         return await this.sendRequest("POST", "mcp", mcp);
     }
 
@@ -226,7 +248,7 @@ class BackendClient {
         return await this.sendRequest("DELETE", `mcp/${serverLabel}`);
     }
 
-    async setMcpToolApproval(serverLabel: string, toolName: string, approval: string): Promise<void> {
+    async setMcpToolApproval(serverLabel: string, toolName: string, approval: ToolApprovalState): Promise<void> {
         const body = {tool_name: toolName, approval: approval};
         await this.sendRequest("PATCH", `mcp/${serverLabel}/approval`, body);
     }

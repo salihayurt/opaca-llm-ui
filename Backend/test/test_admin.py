@@ -121,7 +121,7 @@ async def test_block_session():
 
 # The LOGOUT action internally calls the POST /containers/{id}/logout route
 # We mock this response by returning a 200 status code
-@patch("httpx.AsyncClient.post", new_callable=AsyncMock)
+@patch("httpx.AsyncClient.request", new_callable=AsyncMock)
 @pytest.mark.anyio
 async def test_logout_session(mock_post):
     # Mock the logout call to the OPACA platform
@@ -131,7 +131,7 @@ async def test_logout_session(mock_post):
     user_session = await create_or_refresh_session("user")
 
     # Modify the container login list manually
-    user_session.opaca_client.logged_in_containers["example-container"] = "TestToken"
+    user_session.opaca_client.container_tokens["example-container"] = "TestToken"
 
     # Make sure the container login is present
     res = client.get("/admin/sessions", headers={"x-api-password": ADMIN_PWD})

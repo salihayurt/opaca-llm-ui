@@ -348,11 +348,14 @@ Now, using the tools available to you and the previous results, continue with yo
                     if agent_name not in worker_agents:
                         agent_data = agent_details[agent_name]["description"]
                         
-                        # Get functions from platform
-                        agent_tools = await self.session.opaca_client.get_actions_openapi(inline_refs=True)
-                        agent_tools, errors = openapi_to_functions(agent_tools, agent=agent_name)
-                        if errors:
-                            logger.warning(errors)
+                        if agent_name in self.session.mcp_servers:
+                            agent_tools = [tool.cast_to_openai_tool() for tool in self.session.mcp_servers[agent_name].tools.values() if tool.approval != 'deny']
+                        else:
+                            # Get functions from platform
+                            agent_tools = await self.session.opaca_client.get_actions_openapi(inline_refs=True)
+                            agent_tools, errors = openapi_to_functions(agent_tools, agent=agent_name)
+                            if errors:
+                                logger.warning(errors)
                         
                         # Create worker agents for each unique agent in the plan
                         worker_agents[agent_name] = WorkerAgent(
@@ -480,6 +483,13 @@ Please address these specific improvements:
         agent_details["GeneralAgent"] = {"description": GENERAL_AGENT_DESC, "functions": ["GeneralAgent--getGeneralCapabilities"]}
         if self.internal_tools:
             agent_details["InternalToolsAgent"] = {"description": INTERNAL_AGENT_DESC, "functions": [tool["name"] for tool in self.internal_tools.get_internal_tools_openai()]}
+        for server_label, server in self.session.mcp_servers.items():
+            functions = [tool.get_full_name() for tool in server.tools.values() if tool.approval != 'deny']
+            if functions:
+                agent_details[server_label] = {
+                    "description": f"Capabilities of an MCP Server: {server_label}",
+                    "functions": functions
+                }
         return agent_details
 
     @staticmethod
@@ -514,10 +524,7 @@ Please address these specific improvements:
         await self.send_to_websocket(StatusMessage(agent=agent, status=message, chat_id=self.chat.chat_id))
 
     async def invoke_tools(self, agent: WorkerAgent, task_str: str, message: AgentMessage) -> AgentResult:
-        tool_results = await asyncio.gather(*[
-            self.invoke_tool(tool.name, tool.args, tool.id)
-            for tool in message.tools
-        ])
+        tool_results = await self.invoke_all_tools(message)
         message.tools = tool_results        
         tool_output = "\n".join(
             f"- Worker Agent Executed: {tool.name}."

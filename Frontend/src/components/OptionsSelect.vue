@@ -1,48 +1,35 @@
 <template>
 <div>
-    <div id="options-selector"
-         class="accordion">
-
-        <!-- Loop for methods, language and color mode -->
-        <div v-for="{ data, name, elementId, icon } in this.getCombinedSettingsData()"
-             class="accordion-item m-0">
-
-            <!-- Header -->
-            <div class="accordion-header options-header">
-                <div class="accordion-button collapsed d-flex p-2 rounded-0"
-                     data-bs-toggle="collapse"
-                     :data-bs-target="`#selector-${elementId}`">
-                    <div class="d-flex me-1 p-1 text-start" style="height: 100%">
-                        <i class="fa fs-4" :class="[icon]" style="width: 30px" />
-                    </div>
-                    <div class="d-flex flex-column">
-                        <div>
-                            {{ data[this.getSelectedItem(elementId)] }}
-                        </div>
-                        <div class="text-muted">
-                            {{ name }}
-                        </div>
-                    </div>
+    <AppAccordion
+        id="options-selector"
+        :items="getCombinedSettingsData()"
+        :get-key="setting => setting.elementId"
+        variant="compact"
+    >
+        <template #header="{ item: { data, name, elementId, icon } }">
+            <div class="d-flex me-1 p-1 text-start" style="height: 100%">
+                <i class="fa fs-4" :class="[icon]" style="width: 30px" />
+            </div>
+            <div class="d-flex flex-column">
+                <div>
+                    {{ data[this.getSelectedItem(elementId)] }}
+                </div>
+                <div class="text-muted">
+                    {{ name }}
                 </div>
             </div>
+        </template>
 
-            <!-- Body -->
-            <div :id="`selector-${elementId}`"
-                 class="accordion-collapse collapse"
-                 data-bs-parent="#options-selector">
-                <div class="accordion-body">
-                    <div v-for="(name, itemId) in data"
-                         :key="itemId"
-                         class="options-item"
-                         @click="this.select(elementId, itemId)">
-                        {{ name }}
-                        <i class="fa fa-check-circle ms-1" v-if="this.isSelectedItem(elementId, itemId)" />
-                    </div>
-                </div>
+        <template #body="{ item: { data, elementId } }">
+            <div v-for="(name, itemId) in data"
+                 :key="itemId"
+                 class="options-item"
+                 @click="this.select(elementId, itemId)">
+                {{ name }}
+                <i class="fa fa-check-circle ms-1" v-if="this.isSelectedItem(elementId, itemId)" />
             </div>
-
-        </div>
-    </div>
+        </template>
+    </AppAccordion>
 </div>
 </template>
 
@@ -51,11 +38,12 @@ import conf, {Methods} from '../../config.js';
 import Localizer from "../Localizer.js";
 import AudioManager from "../AudioManager.js";
 import { getCurrentTheme, getColorThemes, setColorTheme } from '../ColorThemes.js';
+import AppAccordion from "./AppAccordion.vue";
 import ComboBox from "./ComboBox.vue";
 
 export default {
     name: "OptionsSelect",
-    components: {ComboBox},
+    components: {AppAccordion, ComboBox},
     data() {
         return {
             selectedItems: {},
@@ -158,11 +146,6 @@ export default {
     max-width: 800px;
 }
 
-.options-header {
-    margin: 0;
-    cursor: pointer;
-}
-
 .options-item {
     color: var(--text-primary-color);
     cursor: pointer;
@@ -176,28 +159,5 @@ export default {
 
 .options-item-disabled {
     cursor: default;
-}
-
-.accordion-item {
-    min-width: min(300px, 100vw - 6rem);
-    max-width: calc(100vw - 6rem);
-}
-
-.accordion-button .text-muted {
-    transition: color 0.2s ease;
-}
-
-.accordion-button:hover .text-muted {
-    color: var(--text-primary-color) !important;
-}
-
-.accordion-button:not(.collapsed) .text-muted {
-    color: var(--text-primary-color) !important;
-}
-
-.accordion-header,
-.accordion-item,
-.accordion-button {
-    border-radius: 0 !important;
 }
 </style>

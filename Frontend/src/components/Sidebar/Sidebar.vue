@@ -44,6 +44,11 @@
                    :title="Localizer.get('sidebar_agents')"
                    v-bind:class="{'sidebar-menu-item-select': SidebarManager.isViewSelected('agents')}"/>
 
+                <i @click="SidebarManager.toggleView('playBooks')"
+                   class="fa fa-clipboard-check sidebar-menu-item"
+                   :title="Localizer.get('sidebar_playBooks')"
+                   v-bind:class="{'sidebar-menu-item-select': SidebarManager.isViewSelected('playBooks')}"/>
+
                 <i @click="SidebarManager.toggleView('extensions')"
                    class="fa fa-puzzle-piece sidebar-menu-item"
                    :title="Localizer.get('sidebar_extensions')"
@@ -123,7 +128,6 @@
                 <SidebarChats
                     v-show="SidebarManager.isViewSelected('chats')"
                     :selected-chat-id="this.selectedChatId"
-                    :is-finished="this.isFinished"
                     :chats="this.chats"
                     @select-chat="chatId => this.$emit('select-chat', chatId)"
                     @delete-chat="chatId => this.$emit('delete-chat', chatId)"
@@ -161,6 +165,13 @@
                     ref="agents"
                 />
 
+                <!-- play books -->
+                <SidebarPlayBooks
+                    v-show="SidebarManager.isViewSelected('playBooks')"
+                    :sidebar-view="SidebarManager.getSelectedView()"
+                    ref="playBooks"
+                />
+
                 <!-- UI extensions -->
                 <SidebarExtensions
                     v-show="SidebarManager.isViewSelected('extensions')"
@@ -171,7 +182,6 @@
                 <!-- MCP servers -->
                 <SidebarMcp
                     v-show="SidebarManager.isViewSelected('mcp')"
-                    :is-platform-connected="connected"
                     ref="mcp"
                 />
 
@@ -216,6 +226,7 @@ import SidebarFaq from "./SidebarFaq.vue";
 import SidebarChats from "./SidebarChats.vue";
 import SidebarFiles from "./SidebarFiles.vue";
 import SidebarMcp from "./SidebarMcp.vue";
+import SidebarPlayBooks from "./SidebarPlayBooks.vue";
 import backendClient from "../../utils.js";
 
 export default {
@@ -229,13 +240,13 @@ export default {
         SidebarInfo,
         SidebarConfig,
         SidebarAgents,
+        SidebarPlayBooks,
         SidebarExtensions,
         SidebarQuestions,
     },
     props: {
         connected: Boolean,
         selectedChatId: String,
-        isFinished: Boolean,
     },
     emits: [
         'select-question',

@@ -20,6 +20,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Response, HTTPException, UploadFile, Depends, Header, Query
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
+from opaca.models import PostContainer
 from starlette.websockets import WebSocket
 from starlette.datastructures import Headers
 from openai import OpenAI
@@ -27,7 +28,7 @@ from openai import OpenAI
 from . import sample_prompts as prompts
 from .models import ConnectRequest, ToolApprovalUpdateRequest, QueryRequest, QueryResponse, ConfigPayload, Chat, RestrictedActions, \
     SearchResult, get_supported_models, SessionData, OpacaException, MCPCreateRequest, PushMessage, \
-    InvokeRequest, InvokeResponse, SessionPrompts, ReloadChatsMessage, OpacaFile
+    InvokeRequest, InvokeResponse, SessionPrompts, ReloadChatsMessage, OpacaFile, PlayBook
 from .simple import SimpleMethod
 from .simple_tools import SimpleToolsMethod
 from .toolllm import ToolLLMMethod
@@ -175,7 +176,7 @@ async def set_blacklist(restrictions: RestrictedActions, auth = Depends(require_
 
 
 @app.post("/connect", description="Connect to OPACA Runtime Platform. Returns the status code of the original request (to differentiate from errors resulting from this call itself).", tags=["opaca"])
-async def connect(connect: ConnectRequest, session: SessionData = Depends(handle_session_http)) -> int:
+async def platform_connect(connect: ConnectRequest, session: SessionData = Depends(handle_session_http)) -> int:
     return await session.opaca_client.connect(connect.url, connect.user, connect.pwd)
 
 
@@ -222,9 +223,12 @@ async def get_internal_tools(session: SessionData = Depends(handle_session_http)
 
 
 @app.post("/containers", description="Deploy or update container to connected OPACA Runtime Platform.", tags=["opaca"])
-async def post_container(post_container: dict, update: bool = False, session: SessionData = Depends(handle_session_http)) -> dict:
+async def post_container(data: PostContainer, update: bool = False, session: SessionData = Depends(handle_session_http)) -> dict:
     try:
-        await session.opaca_client.deploy_container(post_container, update)
+        if update:
+            await session.opaca_client.put_container(data)
+        else:
+            await session.opaca_client.post_container(data)
         return {"success": True}
     except HTTPStatusError as e:
         message = "Unauthorized" if e.response.status_code == 403 else unpack_error(e.response.json())
@@ -235,7 +239,7 @@ async def post_container(post_container: dict, update: bool = False, session: Se
 
 @app.delete("/containers/{container_id}", description="Undeploy container from connected OPACA Runtime Platform.", tags=["opaca"])
 async def delete_container(container_id: str, session: SessionData = Depends(handle_session_http)) -> None:
-    await session.opaca_client.stop_container(container_id)
+    await session.opaca_client.delete_container(container_id)
 
 
 @app.get("/containers/{container_id}/approval", description="Get per-tool approvals for a specific container.", tags=["opaca"])
@@ -252,7 +256,7 @@ async def update_container_approval(container_id: str, data: ToolApprovalUpdateR
 @app.post("/invoke", description="Invoke OPACA action directly.", tags=["opaca"])
 async def invoke_action(invoke: InvokeRequest, session: SessionData = Depends(handle_session_http)) -> InvokeResponse:
     try:
-        res = await session.opaca_client.invoke_opaca_action(invoke.action, invoke.agent, invoke.parameters)
+        res = await session.opaca_client.safe_invoke(invoke.action, invoke.agent, invoke.parameters)
         return InvokeResponse(success=True, result=res, error=None)
     except HTTPStatusError as e:
         return InvokeResponse(success=False, result=None, error=unpack_error(e.response.json()))
@@ -278,12 +282,12 @@ async def query_no_history(method: str, message: QueryRequest, session: SessionD
 
 @app.get("/mcp", description="Get a list of all added MCP servers and their actions", tags=["mcp"])
 async def get_mcp_list(session: SessionData = Depends(handle_session_http)) -> Dict:
-    return await session.get_mcp_tools()
+    return session.get_mcp_tools()
 
 
 @app.post("/mcp", description="Add a new MCP server to the list of available MCP servers", tags=["mcp"])
 async def add_mcp_server(mcp: MCPCreateRequest, session: SessionData = Depends(handle_session_http)) -> Response:
-    await session.add_mcp_server(mcp.content)
+    await session.add_mcp_server(mcp)
     return Response(status_code=201)
 
 
@@ -294,10 +298,12 @@ async def delete_mcp_server(server_label: str, session: SessionData = Depends(ha
     else:
         return Response(status_code=404, content="No matching mcp server found!")
 
+
 @app.patch("/mcp/{server_label}/approval", description="Set whether a tool call should be allowed, denied, or require confirmation by the user.", tags=["mcp"])
 async def update_mcp_tool_approval(data: ToolApprovalUpdateRequest, server_label: str, session: SessionData = Depends(handle_session_http)) -> Response:
-    await session.set_mcp_tool_approval(server_label, data.tool_name, data.approval)
+    session.set_mcp_tool_approval(server_label, data.tool_name, data.approval)
     return Response(status_code=204)
+
 
 ### CHAT ROUTES
 
@@ -335,6 +341,8 @@ async def query_chat(method: str, chat_id: str, message: QueryRequest, session: 
         response.make_error_response(e)
     finally:
         chat.is_finished = True
+        await session.websocket_send(ReloadChatsMessage())
+
     return response
 
 
@@ -435,6 +443,7 @@ async def reset_config(method: str, session: SessionData = Depends(handle_sessio
     session.config[method] = METHODS[method].CONFIG()
     return ConfigPayload(config_values=session.config[method], config_schema=METHODS[method].config_schema())
 
+
 ## FILE ROUTES
 
 @app.get("/files", description="Get a list of all uploaded files.", tags=["files"])
@@ -479,8 +488,6 @@ async def delete_file(file_id: str, ignore_error: bool = False, session: Session
     return await delete_file_from_all_clients(session, file_id, ignore_error)
 
 
-
-
 @app.patch("/files/{file_id}", description="Mark a file as suspended or unsuspended.", tags=["files"])
 async def update_file(file_id: str, name: str | None = None, session: SessionData = Depends(handle_session_http)) -> bool:
     files = session.uploaded_files
@@ -492,7 +499,6 @@ async def update_file(file_id: str, name: str | None = None, session: SessionDat
         rename_file(files[file_id], name)
 
     return True
-
 
 
 @app.get("/files/{file_id}/view", description="Serve a previously uploaded file for preview.", tags=["files"])
@@ -517,7 +523,7 @@ async def view_file(file_id: str, session: SessionData = Depends(handle_session_
     )
 
 
-# sample prompts
+# SAMPLE PROMPTS
 
 @app.get("/prompts", description="Get the Prompt Library data for the current session.", tags=["sample prompts"])
 async def get_prompts(session: SessionData = Depends(handle_session_http)) -> SessionPrompts:
@@ -559,6 +565,26 @@ async def post_default_prompts(data: SessionPrompts, auth = Depends(require_pass
 @app.delete("/prompts/default", description="Reset default Sample Prompts for new sessions", tags=["sample prompts", "admin"])
 async def reset_default_prompts(auth = Depends(require_password)) -> None:
     prompts.reset_default_prompts()
+
+
+# play books
+
+@app.get("/play-books", description="Get user-defined play books for the current session.", tags=["play books"])
+async def get_play_books(session: SessionData = Depends(handle_session_http)) -> List[PlayBook]:
+    return session.play_books
+
+
+@app.post("/play-books", description="Add or update a play book for the current session.", tags=["play books"])
+async def post_play_book(data: PlayBook, session: SessionData = Depends(handle_session_http)) -> PlayBook:
+    session.set_play_book(data)
+    return data
+
+
+@app.delete("/play-books/{play_book_id}", description="Delete a play book from the current session.", tags=["play books"])
+async def delete_play_book(play_book_id: str, session: SessionData = Depends(handle_session_http)) -> Response:
+    if not session.delete_play_book(play_book_id):
+        raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail=f"Play book '{play_book_id}' not found.")
+    return Response(status_code=HTTPStatus.NO_CONTENT)
 
 
 # USER ROUTES
@@ -690,14 +716,14 @@ async def handle_session_id(source: Union[Request, WebSocket], response: Optiona
     else:
         session = await create_or_refresh_session(session_id, max_age)
 
+    if session.blocked:
+        raise OpacaException("The session has been blocked. If you think this is an error, please consult the platform administrator.")
+
     # If it's an HTTP request, and you want to set a cookie
     # This will also set the session id for logged in users, important for the websocket connection
     if response is not None:
         # create Cookie (or just update max-age if already exists)
         response.set_cookie("session_id", session.session_id, max_age=max_age)
-
-    if session.blocked:
-        raise OpacaException("The session has been blocked. If you think this is an error, please consult the platform administrator.")
 
     # Return the session data for the session ID
     return session

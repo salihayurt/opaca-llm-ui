@@ -95,25 +95,31 @@ class RestrictedActions(BaseModel):
     need_confirmation: List[str]
 
 
-class MCPCreateRequest(BaseModel):
-    """
-    Used as payload for creating a new MCP server connection.
-
-    Attributes:
-        content: the full MCP server configuration, including server_url, server_label, default_approval
-    """
-    content: Dict[str, Any]
-
-
 class ToolApprovalState(Enum):
     ASK = "ask"
     DENY = "deny"
     ALLOW = "allow"
 
 
+class MCPCreateRequest(BaseModel):
+    """
+    Used as payload for creating a new MCP server connection.
+
+    Attributes:
+        type: the type of the MCP server, usually "mcp"
+        server_url: the URL of the MCP server to connect to
+        server_label: a human-readable label for the MCP server; if not given, it will be derived from the URL
+        default_approval: the default approval state for tools from this MCP server (ask/allow/deny)
+    """
+    type: str
+    server_url: str
+    server_label: str | None = None
+    default_approval: ToolApprovalState
+
+
 class ToolApprovalUpdateRequest(BaseModel):
     """Used as payload for updating the approval status of a tool.
-    
+
     Attributes:
         tool_name: the full name of the tool for which the approval status should be updated
         approval: the new approval status
@@ -221,9 +227,15 @@ class ChatMessage(BaseModel):
     content: str | List[Dict[str, Any]]
 
 
+class ToolType(str, Enum):
+    OPACA = "opaca"
+    MCP = "mcp"
+    INTERNAL = "internal"
+
+
 class ToolCall(BaseModel):
     id: str
-    type: Literal["opaca", "mcp"]
+    type: ToolType
     name: str
     args: Dict[str, Any] = {}
     result: Any | None = None
@@ -240,7 +252,6 @@ class InternalTool(BaseModel):
     required_params: list[str] | None = None
     result: str
     function: Callable
-    requires_code_execution: bool = False
 
 
 class ScheduledTask(BaseModel):
@@ -279,6 +290,14 @@ class PromptCategory(BaseModel):
     visible: bool = True
     is_default: bool = True
     questions: List[Prompt] = []
+
+
+class PlayBook(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    when_to_use: str
+    what_to_do: str
+    enabled: bool = True
 
 
 class Chat(BaseModel):
@@ -350,17 +369,12 @@ class MCPTool(BaseModel):
         }
 
 
-class MCPServerParams(BaseModel):
+class MCPServer(BaseModel):
     server_url: str
     server_label: str
     type: str | None = None
-    require_approval: str
-
-
-class MCPServer(BaseModel):
-    params: MCPServerParams
     tools: Dict[str, MCPTool] = Field(default_factory=dict)
-    
+
 
 class SessionData(BaseModel):
     """
@@ -379,6 +393,7 @@ class SessionData(BaseModel):
         mcp_servers: All added mcp server information in JSON format.
         blocked: Whether this session is currently blocked, not accepting any requests.
         prompts: Prompt Library data.
+        play_books: User-defined play books exposed through internal tools.
         is_notifs_aborted: Boolean indicating if all current notification generations should be aborted.
     Transient fields:
         _websocket: Can be used to send intermediate result and other messages back to the UI
@@ -406,6 +421,7 @@ class SessionData(BaseModel):
     opaca_approvals: Dict[str, Dict[str, ToolApprovalState]] = Field(default_factory=dict)
     blocked: bool = False
     prompts: SessionPrompts | None = None
+    play_books: List[PlayBook] = Field(default_factory=list)
     is_notifs_aborted: bool = False
 
     _websocket: WebSocket | None = PrivateAttr(default=None)
@@ -424,6 +440,23 @@ class SessionData(BaseModel):
     def create_scheduled_task_id(self) -> int:
         self.last_scheduled_task_id += 1
         return self.last_scheduled_task_id
+
+    def enabled_play_books(self) -> List[PlayBook]:
+        return [play_book for play_book in self.play_books if play_book.enabled]
+
+    def set_play_book(self, play_book: PlayBook) -> None:
+        for index, current_play_book in enumerate(self.play_books):
+            if current_play_book.id == play_book.id:
+                self.play_books[index] = play_book
+                return
+        self.play_books.append(play_book)
+
+    def delete_play_book(self, play_book_id: str) -> bool:
+        for index, play_book in enumerate(self.play_books):
+            if play_book.id == play_book_id:
+                self.play_books.pop(index)
+                return True
+        return False
 
     @property
     def opaca_client(self) -> OpacaClient:
@@ -504,24 +537,24 @@ class SessionData(BaseModel):
         else:
             raise Exception("Websocket not connected")
 
-    async def get_mcp_tools(self) -> dict[str, list[MCPTool]]:
+    def get_mcp_tools(self) -> dict[str, list[MCPTool]]:
         """Returns a list of all available mcp server tools."""
-        tools = {}
-        for server in self.mcp_servers.values():
-            tools[server.params.server_label] = list(server.tools.values())
-        return tools
+        return {
+            server.server_label: list(server.tools.values())
+            for server in self.mcp_servers.values()
+        }
 
-    async def set_mcp_tool_approval(self, server_label: str, tool_name: str, approval: ToolApprovalState):
-        """Set whether a tool call should be allowed, denied, or require confirmation by the user."""
-        server = self.mcp_servers.get(server_label)
-        if not server:
-            raise KeyError(f"MCP server with label '{server_label}' not found.")
-        
+    def get_mcp_tool(self, server_label: str, tool_name: str) -> MCPTool:
         full_name = f"{server_label}--{tool_name}"
-        tool = server.tools.get(full_name)
-        if not tool:
+        if not (server := self.mcp_servers.get(server_label)):
+            raise KeyError(f"MCP server with label '{server_label}' not found.")
+        if not (tool := server.tools.get(full_name)):
             raise KeyError(f"Tool '{full_name}' not found in MCP server '{server_label}'.")
-        
+        return tool
+    
+    def set_mcp_tool_approval(self, server_label: str, tool_name: str, approval: ToolApprovalState):
+        """Set whether a tool call should be allowed, denied, or require confirmation by the user."""
+        tool = self.get_mcp_tool(server_label, tool_name)
         tool.approval = approval
 
     def get_opaca_tool_approval(self, tool_name: str) -> ToolApprovalState:
@@ -536,58 +569,45 @@ class SessionData(BaseModel):
             self.opaca_approvals[container_id] = {}
         self.opaca_approvals[container_id][tool_name] = approval
 
-
-    async def add_mcp_server(self, params: Dict[str, Any]) -> bool:
+    async def add_mcp_server(self, req: MCPCreateRequest) -> bool:
         """Adds a new mcp server json"""
 
-        # Check if the server_url field is existing
-        if "server_url" not in params:
-            raise OpacaException("The 'server_url' field is required.", "No 'server_url' provided!", 400)
-
         # Check if the server url is in a valid format:
-        if not re.match(r'^https?://', params["server_url"]):
+        if not re.match(r'^https?://', req.server_url):
             raise OpacaException("The 'server_url' needs to be in a valid url-format (e.g. 'http://<address>.com/mcp')", "Malformed 'server_url'!", 400)
 
         # Check if a previous mcp server with the same url already exists
-        if any(m.params.server_url == params["server_url"] for m in self.mcp_servers.values()):
-            raise OpacaException(f"An MCP server with the given server_url '{params['server_url']}' already exists!", "Duplicate 'server_url'!", 400)
+        if any(m.server_url == req.server_url for m in self.mcp_servers.values()):
+            raise OpacaException(f"An MCP server with the given server_url '{req.server_url}' already exists!", "Duplicate 'server_url'!", 400)
 
         # If no server label was given, transform the server_url into the label
-        if not params.get("server_label"):
-            params["server_label"] = re.sub(r'^.*//([^/]+).*$', r'\1', params["server_url"]).replace('.', '-')
-            
-        label = params["server_label"]
+        if not req.server_label:
+            req.server_label = re.sub(r'^.*//([^/]+).*$', r'\1', req.server_url).replace('.', '-')
 
         # Check if a previous mcp server with the same label already exists (UI saves mcp servers based on label)
-        if label in self.mcp_servers:
-            raise OpacaException(f"An MCP server with the given server_label '{label}' already exists!", "Duplicate 'server_label'!", 400)
+        if req.server_label in self.mcp_servers:
+            raise OpacaException(f"An MCP server with the given server_label '{req.server_label}' already exists!", "Duplicate 'server_label'!", 400)
 
         # Check if the given server-url is actually an mcp server
-        client = MCPClient(server_url=params["server_url"])
+        client = MCPClient(server_url=req.server_url)
         client_tools = await client.list_tools()
         if not client_tools:
-            raise OpacaException(f"The given server_url '{params['server_url']}' provides no mcp tools and cannot be added!", "Unreachable MCP server!", 400)
+            raise OpacaException(f"The given server_url '{req.server_url}' provides no mcp tools and cannot be added!", "Unreachable MCP server!", 400)
 
-        # Disable auto-execution of MCP tools by LiteLLM: Force it to always require approval
-        # Our backend manages the permission flow itself with UI integration
-        params["require_approval"] = "always"
-
-        # Extract and remove default_approval from the mcp_server dict (prevent litellm unknown parameter exception)
-        default_approval = params.pop("default_approval", ToolApprovalState.ASK)
-
-        mcp_tools = {}
-        for tool in client_tools:
-            full_name = f"{label}--{tool.name}"
-            mcp_tools[full_name] = MCPTool(
+        mcp_tools = {
+            f"{req.server_label}--{tool.name}": MCPTool(
                 name=tool.name,
-                description=tool.description if tool.description else '',
+                description=tool.description or '',
                 inputSchema=tool.inputSchema,
-                server_label=label,
-                approval=default_approval
+                server_label=req.server_label,
+                approval=req.default_approval
             )
-
-        self.mcp_servers[label] = MCPServer(
-            params=MCPServerParams.model_validate(params),
+            for tool in client_tools
+        }
+        self.mcp_servers[req.server_label] = MCPServer(
+            server_url=req.server_url,
+            server_label=req.server_label,
+            type=req.type,
             tools=mcp_tools
         )
         return True
@@ -863,7 +883,7 @@ class LLMConfig(BaseModel):
         filtered = self._filter_supported(self.parameters.model_dump())
         self.parameters = LLMParameters(**filtered)
         return self
-    
+
     def _filter_supported(self, params: dict) -> dict:
         """Remove unsupported parameters from config schema."""
         supported = get_supported_openai_params(self.model)

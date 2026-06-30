@@ -33,7 +33,8 @@ SAGE provides a RESTful API for most requests, while also providing a websocket 
 
 * `GET /mcp`: Returns all available MCP tools for the current session.
 * `POST /mcp`: Adds a new MCP endpoint and all its tools to the current session.
-* `DELETE /mcp`: Deletes an MCP endpoint and removes its tools from the current session.
+* `DELETE /mcp/{server_label}`: Deletes an MCP endpoint and removes its tools from the current session.
+* `PATCH /mcp/{server_label}/approval`: Updates the approval type for a tool (e.g. "ask", "deny", "allow").
 
 #### File routes
 

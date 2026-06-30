@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import time
 
@@ -63,10 +64,7 @@ class SimpleToolsMethod(AbstractMethod):
                 if not result.tools:
                     break
 
-                tool_entries = [
-                    await self.invoke_tool(call.name, call.args, call.id)
-                    for call in result.tools
-                ]
+                tool_entries = await self.invoke_all_tools(result)
                 tool_contents = "\n".join(
                     f"The result of tool '{tool.name}' with parameters '{tool.args}' was: {tool.result}"
                     for tool in tool_entries

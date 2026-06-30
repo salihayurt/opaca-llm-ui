@@ -11,81 +11,70 @@
            :title="Localizer.get('questions_toggleEditMode')" />
     </div>
 
-    <div id="sidebar-questions" class="accordion">
-        <div v-for="(section, index) in Localizer.getPrompts()"
-             v-show="section.visible"
-             :key="index"
-             class="accordion-item">
+    <AppAccordion
+        id="sidebar-questions"
+        :model-value="activeQuestionSection"
+        @update:model-value="setActiveQuestionSection"
+        :items="visiblePromptSections"
+        :get-key="getSectionKey"
+        button-class="text-center"
+    >
+        <template #header="{ item: section }">
+            <span class="section-icon">{{ section.icon }}</span>
+            <span class="section-title">{{ section.header }}</span>
+            <span class="section-actions float-end">
+                <i v-if="isEditModeActive && !section.is_default"
+                   class="fa fa-edit click-icon"
+                   :class="{'disabled': !this.isEditingAllowed || (section.id === this.autogenKey && this.isRegenerating)}"
+                   @click.stop.prevent="this.editCategory(section)"
+                   :title="Localizer.get('questions_editCategory')"
+                />
+                <i v-if="isEditModeActive"
+                   class="fa fa-remove click-icon"
+                   :class="{'disabled': !this.isEditingAllowed || (section.id === this.autogenKey && this.isRegenerating)}"
+                   @click.stop.prevent="this.deleteCategory(section, getSectionIndex(section))"
+                   :title="Localizer.get('questions_deleteCategory')"
+                />
+            </span>
+        </template>
 
-            <!-- header -->
-            <div class="accordion-header text-center d-flex align-items-center" style="background-color: var(--background-color)">
-                <button class="accordion-button collapsed text-center" type="button"
-                        @click="this.toggleSection(index)"
-                        aria-expanded="false" :aria-controls="'questions-' + index" >
-                    <span class="section-icon">{{ section.icon }}</span>
-                    <span class="section-title">{{ section.header }}</span>
-                    <span class="float-end">
-                        <i v-if="isEditModeActive && !section.is_default"
-                           class="fa fa-edit click-icon"
-                           :class="{'disabled': !this.isEditingAllowed || (section.id === this.autogenKey && this.isRegenerating)}"
-                           @click.stop.prevent="this.editCategory(section)"
-                           :title="Localizer.get('questions_editCategory')"
-                        />
-                        <i v-if="isEditModeActive"
-                           class="fa fa-remove click-icon"
-                           :class="{'disabled': !this.isEditingAllowed || (section.id === this.autogenKey && this.isRegenerating)}"
-                           @click.stop.prevent="this.deleteCategory(section, index)"
-                           :title="Localizer.get('questions_deleteCategory')"
-                        />
-                    </span>
-                </button>
+        <template #body="{ item: section }">
+            <!-- category questions -->
+            <div v-for="(q, qIndex) in section.questions"
+                 :key="qIndex"
+                 class="question-item"
+                 @click="this.$emit('select-question', q.question)">
+                <span class="question-text">
+                    <i v-if="section.id === this.autogenKey && isRegenerating"
+                       :class="['fa', 'fa-ellipsis', 'fa-beat-fade', 'text-center', 'w-100']"
+                    />
+                    <span v-else class="mb-auto">{{ q?.question }}</span>
+                </span>
+                <i v-if="isEditModeActive && !section.is_default && section.id !== this.autogenKey"
+                   class="fa fa-edit click-icon"
+                   :class="{'disabled': !this.isEditingAllowed}"
+                   @click.stop="this.editPrompt(section, q)"
+                   :title="Localizer.get('questions_editPrompt')"
+                />
+                <i v-if="isEditModeActive && section.id !== this.autogenKey"
+                   class="fa fa-remove click-icon"
+                   :class="{'disabled': !this.isEditingAllowed}"
+                   @click.stop="this.deletePrompt(section, q, qIndex)"
+                   :title="Localizer.get('questions_deletePrompt')"
+                />
             </div>
 
-            <!-- body -->
-            <div :id="'questions-' + index"
-                 class="accordion-collapse collapse"
-                 data-bs-parent="#sidebar-questions">
-                <div class="accordion-body">
-
-                    <!-- category questions -->
-                    <div v-for="(q, qIndex) in section.questions"
-                         :key="qIndex"
-                         class="question-item"
-                         @click="this.$emit('select-question', q.question)">
-                        <span class="question-text">
-                            <i v-if="section.id === this.autogenKey && isRegenerating"
-                               :class="['fa', 'fa-ellipsis', 'fa-beat-fade', 'text-center', 'w-100']"
-                            />
-                            <span v-else class="mb-auto">{{ q?.question }}</span>
-                        </span>
-                        <i v-if="isEditModeActive && !section.is_default && section.id !== this.autogenKey"
-                           class="fa fa-edit click-icon"
-                           :class="{'disabled': !this.isEditingAllowed}"
-                           @click.stop="this.editPrompt(section, q)"
-                           :title="Localizer.get('questions_editPrompt')"
-                        />
-                        <i v-if="isEditModeActive && section.id !== this.autogenKey"
-                           class="fa fa-remove click-icon"
-                           :class="{'disabled': !this.isEditingAllowed}"
-                           @click.stop="this.deletePrompt(section, q, qIndex)"
-                           :title="Localizer.get('questions_deletePrompt')"
-                        />
-                    </div>
-
-                    <!-- add new prompt button -->
-                    <div v-if="isEditModeActive && !section.is_default && section.id !== this.autogenKey"
-                         class="question-item justify-content-center"
-                         :class="{'disabled': !this.isEditingAllowed}"
-                         :aria-disabled="!isEditingAllowed"
-                         @click.stop="this.addNewPrompt(section)">
-                        <i class="fa fa-plus me-1" />
-                        <span>{{ Localizer.get('questions_addPrompt') }}</span>
-                    </div>
-
-                </div>
+            <!-- add new prompt button -->
+            <div v-if="isEditModeActive && !section.is_default && section.id !== this.autogenKey"
+                 class="question-item justify-content-center"
+                 :class="{'disabled': !this.isEditingAllowed}"
+                 :aria-disabled="!isEditingAllowed"
+                 @click.stop="this.addNewPrompt(section)">
+                <i class="fa fa-plus me-1" />
+                <span>{{ Localizer.get('questions_addPrompt') }}</span>
             </div>
-        </div>
-    </div>
+        </template>
+    </AppAccordion>
 
     <div>
         <!-- autogen questions button -->
@@ -124,11 +113,12 @@ import conf from "../../../config.js";
 import backendClient from "../../utils.js";
 import {nextTick} from "vue";
 import {useDevice} from "../../useIsMobile.js";
+import AppAccordion from "../AppAccordion.vue";
 import InputDialogue from "../InputDialogue.vue";
 
 export default {
     name: 'SidebarQuestions',
-    components: { InputDialogue },
+    components: { AppAccordion, InputDialogue },
     emits: [
         'select-question',
     ],
@@ -137,12 +127,12 @@ export default {
             isEditModeActive: false,
             isEditingAllowed: true, // not allowed while save/load calls are in progress
             isRegenerating: false,
+            activeQuestionSection: null,
         }
     },
     setup() {
         const {isMobile} = useDevice();
-        const bsCollapseEvent = 'show.bs.collapse';
-        return { Localizer, isMobile, bsCollapseEvent };
+        return { conf, Localizer, isMobile };
     },
     methods: {
         async autogenerateSampleQuestions(numQuestions = 5) {
@@ -228,48 +218,68 @@ export default {
         async loadPrompts() {
             Localizer.samplePrompts = await backendClient.getPrompts();
             Localizer.reloadSampleQuestions();
+            this.syncActiveQuestionSection();
+        },
+
+        getPromptSections() {
+            return Localizer.getPrompts() ?? [];
+        },
+
+        getSectionKey(section, index) {
+            return section?.id ?? section?.header ?? index;
+        },
+
+        getSectionIndex(section) {
+            return this.getPromptSections().findIndex((candidate, index) => {
+                return candidate === section || this.getSectionKey(candidate, index) === this.getSectionKey(section, index);
+            });
         },
 
         toggleSection(index, show = null) {
             if (index < 0) return;
-            const toggle = document.getElementById('questions-' + index);
-            if (! toggle) return;
-            const collapse = bootstrap.Collapse.getOrCreateInstance(toggle);
+            const section = this.getPromptSections()[index];
+            if (!section) return;
+            const key = this.getSectionKey(section, index);
 
             // show not set -> invert current state
             if (show === null) {
-                show = ! toggle.classList.contains('show');
+                show = this.activeQuestionSection !== key;
             }
 
-            if (show) {
-                collapse.show();
-                const questions = Localizer.getPrompts();
-                const header = index in questions ? questions[index].header : 'none';
-                conf.selectedCategory = header;
-            } else {
-                collapse.hide();
-                conf.selectedCategory = "none";
-            }
-        },
-
-        toggleSectionByHeader(header, show = null) {
-            const index = Localizer.getPrompts()
-                .findIndex(section => section.header === header);
-            this.toggleSection(index, show);
-        },
-
-        expandSectionByHeader(header) {
-            this.toggleSectionByHeader(header, true);
+            this.activeQuestionSection = show ? key : null;
+            this.updateSelectedCategory(this.activeQuestionSection);
         },
 
         toggleSectionById(id, show = null) {
-            const index = Localizer.getPrompts()
+            const index = this.getPromptSections()
                 .findIndex(section => section.id === id);
             this.toggleSection(index, show);
         },
 
         expandSectionById(id) {
             this.toggleSectionById(id, true);
+        },
+
+        setActiveQuestionSection(key) {
+            this.activeQuestionSection = key;
+            this.updateSelectedCategory(key);
+        },
+
+        updateSelectedCategory(key) {
+            const prompts = this.getPromptSections();
+            const index = prompts
+                .findIndex((section, sectionIndex) => this.getSectionKey(section, sectionIndex) === key);
+            conf.selectedCategory = index >= 0
+                ? prompts[index].header
+                : "none";
+        },
+
+        syncActiveQuestionSection() {
+            const prompts = this.getPromptSections();
+            const index = prompts
+                .findIndex(section => section.header === conf.selectedCategory);
+            const section = prompts[index];
+            this.activeQuestionSection = section ? this.getSectionKey(section, index) : null;
         },
 
         async resetPrompts() {
@@ -394,6 +404,10 @@ export default {
     },
 
     computed: {
+        visiblePromptSections() {
+            return this.getPromptSections().filter(section => section.visible);
+        },
+
         /** ID of the "Auto-Generated Questions" category. */
         autogenKey() {
             return 'autogenerated-questions';
@@ -402,9 +416,7 @@ export default {
 
     async mounted() {
         Localizer.samplePrompts = await backendClient.getPrompts();
-
-        // open default category
-        this.expandSectionByHeader(conf.selectedCategory);
+        this.syncActiveQuestionSection();
     }
 }
 </script>
@@ -506,7 +518,7 @@ export default {
     background-color: var(--background-color) !important;
 }
 
-.accordion-header:hover .click-icon:hover {
+.section-actions .click-icon:hover {
     background-color: var(--primary-color);
 }
 </style>
