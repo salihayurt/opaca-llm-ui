@@ -273,6 +273,9 @@ export default {
 
         async handleProfileAuthClick() {
             if (this.isAuthenticated) {
+                // Handle backend logout before auth0 redirect to save updated cookie
+                await backendClient.user_logout()
+                // This will reset the "session_id" cookie, there should NEVER be another call here between these two lines
                 await this.logout({ logoutParams: { returnTo: window.location.origin } });
             } else {
                 try {

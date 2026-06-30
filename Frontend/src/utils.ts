@@ -231,6 +231,12 @@ class BackendClient {
         await this.sendRequest("PATCH", `mcp/${serverLabel}/approval`, body);
     }
 
+    // users
+
+    async user_logout(): Promise<string> {
+        return await this.sendRequest("GET", `users/logout`)
+    }
+
     // internal helper
 
     async sendRequest(method: Method | string, path: string, body: any = null, timeout: number = 10000): Promise<any> {

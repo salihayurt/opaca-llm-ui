@@ -561,6 +561,27 @@ async def reset_default_prompts(auth = Depends(require_password)) -> None:
     prompts.reset_default_prompts()
 
 
+# USER ROUTES
+
+@app.get("/users/logout", tags=["users"])
+async def user_logout(request: Request, response: Response) -> str:
+    """
+    Performs a 'logout' by switching to the original session.
+    Be aware that this only resets the http session and a new websocket needs to be established afterward by the frontend,
+    which should automatically happen since the "logout" in the UI will trigger a site refresh.
+    """
+    session = await handle_session_http(request, response)
+    if session.user_id == "":
+        raise HTTPException(status_code=401, detail="Not logged in")
+    if session.original_session_id == "":
+        # This should never happen. The original session should be set when the user_id is set
+        raise HTTPException(status_code=500, detail="Encountered unexpected error during logout. No original session ID found.")
+    max_age = 60 * 60 * 24 * 30  # 30 days
+    org_session = await create_or_refresh_session(session.original_session_id, max_age)
+    response.set_cookie("session_id", org_session.session_id, max_age=max_age)
+    return "Logged out"
+
+
 # WHISPER TTS/STT
 
 @app.post("/whisper/transcribe", tags=["whisper"])
