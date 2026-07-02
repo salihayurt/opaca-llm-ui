@@ -80,7 +80,7 @@
                v-bind:class="{'sidebar-menu-item-select': SidebarManager.isViewSelected('faq')}"/>
 
             <!-- Always Visible: User Profile -->
-            <div class="sidebar-account-wrapper">
+            <div v-if="conf.authEnabled" class="sidebar-account-wrapper">
                 <div class="sidebar-menu-item sidebar-avatar-wrapper"
                      @click.stop="toggleProfileMenu()"
                      :class="{'sidebar-menu-item-select': accountMenuOpen}"
@@ -304,7 +304,7 @@ export default {
         },
 
         async handleProfileSettingsClick() {
-            console.log("Not implemented yet.")
+            alert("Not implemented yet.")
         },
 
         toggleSidebar() {
