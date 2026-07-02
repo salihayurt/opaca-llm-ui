@@ -76,7 +76,7 @@
 
                             <template #body="{ item: action, index: actionIndex }">
                                 <div class="action-body p-2">
-                                    <p v-if="!isInternalContainer(containerId)" class="invoke" @click.stop="invokeAction(agentId, action.name, action.parameters)">
+                                    <p class="invoke" @click.stop="invokeAction(agentId, action.name, action.parameters)">
                                         <strong>{{ Localizer.get('agents_invoke') }}</strong>
                                         <i class="fa fa-circle-play mx-2"/>
                                     </p>
@@ -450,7 +450,6 @@ export default {
                                 .filter(([k, v]) => v !== null || schema[k].required)
                                 .map(([k, v]) => [k, types[schema[k].type] === undefined ? JSON.parse(v) : v])
                     );
-                    // TODO container login? SHOULD work out-of-the-box if we move the container-login in the backend to opaca-client instead of abstract agent?
                     var res = await backendClient.invokeAction(agent, action, parameters);
                     if (res.success) {
                         await this.$refs.input.showInfo(Localizer.get('agents_result'), "```\n" + JSON.stringify(res.result, null, 2) + "\n```");
