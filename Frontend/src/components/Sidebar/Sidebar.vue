@@ -80,7 +80,7 @@
                v-bind:class="{'sidebar-menu-item-select': SidebarManager.isViewSelected('faq')}"/>
 
             <!-- Always Visible: User Profile -->
-            <div v-if="conf.authEnabled" class="sidebar-account-wrapper">
+            <div v-if="authEnabled" class="sidebar-account-wrapper">
                 <div class="sidebar-menu-item sidebar-avatar-wrapper"
                      @click.stop="toggleProfileMenu()"
                      :class="{'sidebar-menu-item-select': accountMenuOpen}"
@@ -271,6 +271,7 @@ export default {
             sidebarToggleHovered: false,
             chats: [],
             accountMenuOpen: false,
+            authEnabled: conf.authEnabled
         };
     },
     methods: {
