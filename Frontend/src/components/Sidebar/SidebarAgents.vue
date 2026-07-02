@@ -31,7 +31,7 @@
         >
             <template #header="{ item: {containerId, image} }">
                 <i :class="isInternalContainer(containerId) ? 'fa fa-cube me-3' : 'fa fa-box me-3'"/>
-                <strong class="container-name">{{ image?.imageName ?? containerId }}</strong>
+                <strong class="container-name">{{ (image?.name === "" ? null : image?.name) ?? image?.imageName ?? containerId }}</strong>
 
                 <i v-if="conf.allowContainerManagement && !isInternalContainer(containerId)"
                     class="fa fa-remove delete-icon"
