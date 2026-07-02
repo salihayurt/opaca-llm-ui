@@ -250,7 +250,7 @@ async def invoke_action(invoke: InvokeRequest, session: SessionData = Depends(ha
     tool_call = ToolCall(name=tool_name, type=tool_caller.determine_tool_type(tool_name), id="none", args=invoke.parameters)
     tool_result = await tool_caller.invoke_tool(tool_call, skip_approval=True)
 
-    if isinstance(tool_result.result, str) and tool_result.result.startswith(("Failed to invoke ", "Execution ")):
+    if isinstance(tool_result.result, str) and tool_result.result.startswith("Failed to invoke "):
         return InvokeResponse(success=False, result=None, error=tool_result.result)
     else:
         return InvokeResponse(success=True, result=tool_result.result, error=None)

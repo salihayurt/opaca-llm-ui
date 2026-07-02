@@ -56,10 +56,10 @@ class ToolCaller:
 
             if approval_state == ToolApprovalState.DENY:
                 # Should not happen due to filtering in get_tools, but double-checking approval status just in case it changes in the future
-                return await create_result("Execution denied by user settings, do not attempt again.")
+                return await create_result("Failed to invoke tool.\nExecution denied by user settings, do not attempt again.")
                 
             if approval_state == ToolApprovalState.ASK and not await self.check_confirmation(tool.name, tool.args):
-                return await create_result("Execution declined by user, do not attempt again.")
+                return await create_result("Failed to invoke tool.\nExecution declined by user, do not attempt again.")
 
         # tools are always formatted the same; provider can be MCP server or OPACA agent
         provider, tool_name = tool.name.split('--', maxsplit=1)
@@ -71,7 +71,7 @@ class ToolCaller:
                 client = MCPClient(server_url=server.server_url)
                 res = await client.call_tool(CallToolRequestParams(name=tool_name, arguments=tool.args))
                 if res.isError:
-                    t_result = f"Execution failed. Error: {res.content}"
+                    t_result = f"Failed to invoke MCP tool.\nError: {res.content}"
                 else:
                     t_result = res.content
             except Exception as e:
