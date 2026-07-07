@@ -15,7 +15,6 @@
                 <DebugMessage
                     :text="debugMessage.text"
                     :type="debugMessage.type"
-                    :execution-time="debugMessage.executionTime"
                 />
             </div>
         </div>

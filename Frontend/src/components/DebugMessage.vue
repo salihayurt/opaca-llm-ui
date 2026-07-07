@@ -12,9 +12,6 @@
         @click="" is intentional, else problems with select-copy-paste -> collapse/expand on header and left margin, not on text
         -->
         <div class="debug-content" @click.stop="">{{getDisplayText()}}</div>
-        <div v-if="executionTime" class="debug-execution-time">
-            Execution time: {{ executionTime.toFixed(2) }}s
-        </div>
     </div>
 </template>
 
@@ -32,10 +29,6 @@ export default {
         type: {
             type: String,
             required: true
-        },
-        executionTime: {
-            type: Number,
-            default: null
         },
     },
     data() {
@@ -93,9 +86,4 @@ export default {
     margin-left: 1rem;
 }
 
-.debug-execution-time {
-    font-size: 0.75rem;
-    margin-top: 0.25rem;
-    opacity: 0.8;
-}
 </style>
