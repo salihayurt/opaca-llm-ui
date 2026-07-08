@@ -15,8 +15,6 @@
                 <DebugMessage
                     :text="debugMessage.text"
                     :type="debugMessage.type"
-                    :execution-time="debugMessage.executionTime"
-                    :response-metadata="debugMessage.responseMetadata"
                 />
             </div>
         </div>
