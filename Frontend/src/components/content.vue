@@ -29,6 +29,7 @@
             @rename-chat="(chatId, newName) => this.handleRenameChat(chatId, newName)"
             @new-chat="() => this.startNewChat()"
             @delete-file="fileId => this.handleDeleteFile(fileId)"
+            @delete-all-files="() => this.handleDeleteAllFiles()"
             @view-file="openViewer"
             @rename-file="handleRenameFile"
             @goto-search-result="(chatId, messageId) => this.gotoSearchResult(chatId, messageId)"
@@ -541,6 +542,29 @@ export default {
                 );
             } else {
                 await this.$refs.sidebar.$refs.files.updateFiles();
+            }
+        },
+
+        async handleDeleteAllFiles() {
+            this.selectedFiles = [];
+            this.viewerFile = null;
+
+            const refresh = async () => {
+                await this.$refs.sidebar.$refs.files.updateFiles();
+                await this.$refs.sidebar.updateChats();
+            };
+
+            const res = await backendClient.deleteAllFiles(false);
+            if (res === false) {
+                await this.$refs.input.showDialogue(
+                    Localizer.get("files_deleteAll"), Localizer.get("files_deleteAll_failed"), null, {},
+                    async () => {
+                        await backendClient.deleteAllFiles(true);
+                        await refresh();
+                    }
+                );
+            } else {
+                await refresh();
             }
         },
 

@@ -31,7 +31,7 @@ from .toolllm import ToolLLMMethod
 from .orchestrated import SelfOrchestratedMethod
 from .internal_tools import InternalTools
 from .code_execution import CodeExecutor
-from .file_utils import delete_file_from_all_clients, save_file_to_disk, create_path, delete_file_from_disk, rename_file
+from .file_utils import delete_file_from_all_clients, save_file_to_disk, create_path, delete_file_from_disk, delete_all_files_from_disk, rename_file
 from .session_manager import create_or_refresh_session, cleanup_task, on_shutdown, load_all_sessions, \
     restore_scheduled_tasks, get_all_sessions, update_session, SessionAction
 from .opaca_client import actions_blacklist
@@ -462,6 +462,20 @@ async def upload_files(chat_id: str | None = None, files: List[UploadFile] | Non
         chat.active_files |= {file.file_id for file in uploaded}
 
     return {"uploadedFiles": uploaded}
+
+
+@app.delete("/files", description="Delete all uploaded files of the current session.", tags=["files"])
+async def delete_all_files(ignore_error: bool = False, session: SessionData = Depends(handle_session_http)) -> bool:
+    for chat in session.chats.values():
+        chat.active_files.clear()
+
+    delete_all_files_from_disk(session.session_id)
+
+    success = True
+    for file_id in list(session.uploaded_files):
+        success = await delete_file_from_all_clients(session, file_id, ignore_error) and success
+
+    return success
 
 
 @app.delete("/files/{file_id}", description="Delete an uploaded file.", tags=["files"])

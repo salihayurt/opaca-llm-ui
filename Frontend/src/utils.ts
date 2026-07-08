@@ -134,6 +134,10 @@ class BackendClient {
         return await this.sendRequest("DELETE", `files/${fileId}?ignore_error=${ignoreError}`);
     }
 
+    async deleteAllFiles(ignoreError: boolean): Promise<boolean> {
+        return await this.sendRequest("DELETE", `files?ignore_error=${ignoreError}`);
+    }
+
     async setFilesActive(chatId: string, activeFiles: any): Promise<void> {
         await this.sendRequest("PUT", `chats/${chatId}`, activeFiles);
     }
