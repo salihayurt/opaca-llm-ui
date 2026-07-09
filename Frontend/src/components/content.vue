@@ -546,26 +546,16 @@ export default {
         },
 
         async handleDeleteAllFiles() {
-            this.selectedFiles = [];
+            const fileIds = Object.keys(this.$refs.sidebar.$refs.files.files);
+
             this.viewerFile = null;
+            this.selectedFiles = [];
 
-            const refresh = async () => {
-                await this.$refs.sidebar.$refs.files.updateFiles();
-                await this.$refs.sidebar.updateChats();
-            };
-
-            const res = await backendClient.deleteAllFiles(false);
-            if (res === false) {
-                await this.$refs.input.showDialogue(
-                    Localizer.get("files_deleteAll"), Localizer.get("files_deleteAll_failed"), null, {},
-                    async () => {
-                        await backendClient.deleteAllFiles(true);
-                        await refresh();
-                    }
-                );
-            } else {
-                await refresh();
+            for (const fileId of fileIds) {
+                await this.handleDeleteFile(fileId);
             }
+
+            await this.$refs.sidebar.updateChats();
         },
 
         async handleRenameFile(fileId, newName) {
