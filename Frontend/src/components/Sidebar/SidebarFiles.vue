@@ -4,6 +4,16 @@
             {{ Localizer.get('sidebar_files') }}
         </div>
 
+        <div class="d-grid gap-2 mb-2">
+            <button type="button"
+                    class="btn btn-danger py-2 w-100"
+                    @click="onDeleteAllFiles"
+                    :disabled="Object.keys(files).length === 0">
+                <i class="fa fa-trash" />
+                {{ Localizer.get('files_deleteAll') }}
+            </button>
+        </div>
+
         <!-- Show info if no files -->
         <div v-if="Object.keys(files).length === 0" class="empty-files text-secondary text-sm p-4">
             {{ Localizer.get('files_missing') }}
@@ -45,6 +55,7 @@ export default {
     },
     emits: [
         'delete-file',
+        'delete-all-files',
         'view-file',
         'rename-file',
         'update-chats',
@@ -61,6 +72,12 @@ export default {
             } catch (error) {
                 console.log(error);
                 this.files = {};
+            }
+        },
+
+        onDeleteAllFiles() {
+            if (confirm(Localizer.get('files_deleteAll_confirm'))) {
+                this.$emit('delete-all-files');
             }
         },
     },

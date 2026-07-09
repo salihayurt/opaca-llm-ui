@@ -114,6 +114,7 @@
                     :chats="this.chats"
                     v-show="SidebarManager.isViewSelected('files')"
                     @delete-file="fileId => this.$emit('delete-file', fileId)"
+                    @delete-all-files="() => this.$emit('delete-all-files')"
                     @view-file="$emit('view-file', $event)"
                     @rename-file="(fileId, newName) => this.$emit('rename-file', fileId, newName)"
                     @update-chats="this.updateChats"
@@ -227,6 +228,7 @@ export default {
         'rename-file',
         'goto-search-result',
         'delete-all-chats',
+        'delete-all-files',
     ],
     setup() {
         const { isMobile } = useDevice();
