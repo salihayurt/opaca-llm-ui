@@ -713,6 +713,11 @@ async def handle_session_id(source: Union[Request, WebSocket], response: Optiona
 
         # This will automatically create a new user session from the current session if no previous one existed
         session = await get_user_session(user_sub, session_id, METHODS)
+
+        # This will overwrite the original session id if the user has logged in from a different client/device
+        if session_id is not None and session_id != session.session_id and session_id != session.original_session_id:
+            session.original_session_id = session_id
+
     else:
         session = await create_or_refresh_session(session_id, max_age)
 
