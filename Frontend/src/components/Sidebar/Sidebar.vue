@@ -81,7 +81,7 @@
 
             <!-- Always Visible: User Profile -->
             <SidebarAccount
-                v-show="authEnabled"
+                v-show="conf.authEnabled"
                 @update-user-info="updateSidebarUserInfo"
                 @update-mcp-servers="$refs.mcp.updateMcp(connected)"
                 ref="account"
@@ -240,14 +240,13 @@ export default {
     ],
     setup() {
         const { isMobile } = useDevice();
-        return { SidebarManager, Localizer, isMobile };
+        return { conf, SidebarManager, Localizer, isMobile };
     },
     data() {
         return {
             sidebarCollapsed: conf.sidebarCollapsed,
             sidebarToggleHovered: false,
             chats: [],
-            authEnabled: conf.authEnabled,
         };
     },
     methods: {

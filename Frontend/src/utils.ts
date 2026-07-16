@@ -271,10 +271,14 @@ class BackendClient {
             headers: {
                 'Content-Type': 'application/json',
                 'Access-Control-Allow-Origin': '*',
-                'Authorization': this.isAuthenticated.value ? `Bearer ${await this.getTokenFn()}` : ``
+                ...(await this.getAuthorizationHeader()),
             }
         });
         return response.data;
+    }
+
+    private async getAuthorizationHeader(): Promise<Record<string, string>> {
+        return this.isAuthenticated.value ? {Authorization: `Bearer ${await this.getTokenFn()}`} : {}
     }
 
 }
