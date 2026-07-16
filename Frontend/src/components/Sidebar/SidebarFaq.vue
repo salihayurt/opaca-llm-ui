@@ -8,7 +8,7 @@
          v-html="this.faqContent"
          class="d-flex flex-column text-start faq-content">
     </div>
-    <div v-else>
+    <div v-else class="sidebar-empty-state">
         {{ Localizer.get('faq_missing') }}
     </div>
 </div>

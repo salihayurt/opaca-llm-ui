@@ -17,7 +17,8 @@
         <i class="fa fa-circle-notch fa-spin me-1" />
         {{ Localizer.get('config_loading', this.method) }}
     </div>
-    <div v-else-if="!this.methodConfig ?? Object.keys(this.methodConfig).length === 0">
+    <div v-else-if="!this.methodConfig ?? Object.keys(this.methodConfig).length === 0"
+         class="sidebar-empty-state">
         {{ Localizer.get('config_missing', this.method) }}
     </div>
     <div v-else class="flex-row text-start">

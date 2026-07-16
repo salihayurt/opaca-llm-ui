@@ -8,7 +8,8 @@
         <i class="fa fa-circle-notch fa-spin me-1" />
         {{ Localizer.get('mcp_loading') }}
     </div>
-    <div v-else-if="!platformMcp || Object.keys(platformMcp).length === 0">
+    <div v-else-if="!platformMcp || Object.keys(platformMcp).length === 0"
+         class="sidebar-empty-state">
         {{ Localizer.get('mcp_missing') }}
     </div>
     <div v-else class="flex-row" >

@@ -8,7 +8,8 @@
         <i class="fa fa-circle-notch fa-spin me-1" />
         {{ Localizer.get('extensions_loading') }}
     </div>
-    <div v-else-if="!this.extraPorts || Object.keys(this.extraPorts).length === 0">
+    <div v-else-if="!this.extraPorts || Object.keys(this.extraPorts).length === 0"
+         class="sidebar-empty-state">
         {{ Localizer.get('extensions_missing') }}
     </div>
     <div v-else class="flex-row" >

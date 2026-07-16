@@ -321,6 +321,13 @@ export default {
     padding-left: .5em;
     margin-bottom: .5em;
 }
+
+.sidebar-empty-state {
+    padding: 1.2rem;
+    color: var(--text-secondary-color);
+    font-size: 1rem;
+    text-align: center;
+}
 </style>
 
 <style scoped>

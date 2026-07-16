@@ -13,7 +13,8 @@
         {{ errorMessage }}
     </div>
 
-    <div v-if="!isLoading && !errorMessage && playBooks.length === 0">
+    <div v-if="!isLoading && !errorMessage && playBooks.length === 0"
+         class="sidebar-empty-state">
         {{ Localizer.get('playBooks_missing') }}
     </div>
 
