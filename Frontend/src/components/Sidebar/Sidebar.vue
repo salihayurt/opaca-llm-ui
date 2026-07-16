@@ -80,35 +80,12 @@
                v-bind:class="{'sidebar-menu-item-select': SidebarManager.isViewSelected('faq')}"/>
 
             <!-- Always Visible: User Profile -->
-            <div v-if="authEnabled" class="sidebar-account-wrapper">
-                <div class="sidebar-menu-item sidebar-avatar-wrapper"
-                     @click.stop="toggleProfileMenu()"
-                     :class="{'sidebar-menu-item-select': accountMenuOpen}"
-                     :title="Localizer.get('sidebar_account')">
-                     <img v-if="isAuthenticated && user?.picture"
-                          :src="user.picture"
-                          class="sidebar-avatar"
-                          alt="User avatar"/>
-                     <i v-else class="fa fa-user"/>
-                </div>
-
-                <div v-if="accountMenuOpen"
-                     class="sidebar-account-menu"
-                     @click.stop>
-                    <button type="button"
-                            class="sidebar-account-menu-button"
-                            @click="handleProfileAuthClick()">
-                        <i :class="['fa', this.isAuthenticated ? 'fa-right-from-bracket' : 'fa-right-to-bracket']"/>
-                        <span>{{ this.isAuthenticated ? Localizer.get('account_logout') : Localizer.get('account_login') }}</span>
-                    </button>
-                    <button type="button"
-                            class="sidebar-account-menu-button"
-                            @click="handleProfileSettingsClick()">
-                        <i class="fa fa-gear"/>
-                        <span>{{ Localizer.get('settings_menu') }}</span>
-                    </button>
-                </div>
-            </div>
+            <SidebarAccount
+                v-show="authEnabled"
+                @update-user-info="updateSidebarUserInfo"
+                @update-mcp-servers="$refs.mcp.updateMcp(connected)"
+                ref="account"
+            />
         </div>
 
         <!-- sidebar content -->
@@ -214,7 +191,6 @@
 import conf from '../../../config.js'
 import { useDevice } from "../../useIsMobile.js";
 import SidebarManager from "../../SidebarManager.js";
-import { useAuthentication } from "../../useAuthentication.ts";
 import Localizer from "../../Localizer.js";
 import SidebarQuestions from './SidebarQuestions.vue';
 import SidebarAgents from "./SidebarAgents.vue";
@@ -227,6 +203,7 @@ import SidebarChats from "./SidebarChats.vue";
 import SidebarFiles from "./SidebarFiles.vue";
 import SidebarMcp from "./SidebarMcp.vue";
 import SidebarPlayBooks from "./SidebarPlayBooks.vue";
+import SidebarAccount from "./SidebarAccount.vue";
 import backendClient from "../../utils.js";
 
 export default {
@@ -243,6 +220,7 @@ export default {
         SidebarPlayBooks,
         SidebarExtensions,
         SidebarQuestions,
+        SidebarAccount,
     },
     props: {
         connected: Boolean,
@@ -262,52 +240,17 @@ export default {
     ],
     setup() {
         const { isMobile } = useDevice();
-        const { loginWithPopup, logout, user, isAuthenticated } = useAuthentication();
-        return { SidebarManager, Localizer, isMobile, loginWithPopup, logout, user, isAuthenticated };
+        return { SidebarManager, Localizer, isMobile };
     },
     data() {
         return {
             sidebarCollapsed: conf.sidebarCollapsed,
             sidebarToggleHovered: false,
             chats: [],
-            accountMenuOpen: false,
-            authEnabled: conf.authEnabled
+            authEnabled: conf.authEnabled,
         };
     },
     methods: {
-        toggleProfileMenu() {
-            this.accountMenuOpen = !this.accountMenuOpen;
-        },
-
-        closeProfileMenu() {
-            this.accountMenuOpen = false;
-        },
-
-        async handleProfileAuthClick() {
-            if (this.isAuthenticated) {
-                // Handle backend logout before auth0 redirect to save updated cookie
-                await backendClient.user_logout()
-                // This will reset the "session_id" cookie, there should NEVER be another call here between these two lines
-                await this.logout({ logoutParams: { returnTo: window.location.origin } });
-            } else {
-                try {
-                    await this.loginWithPopup({authorizationParams: {screen_hint: 'signup'}})
-                } catch (error) {
-                    // Only show an error in the console, if the popup was not closed
-                    if (error.error === 'cancelled') return;
-                    console.error("Auth0 login failed: ", error)
-                }
-            }
-            // Update the sidebar information to reflect the new user state
-            await this.updateSidebarUserInfo();
-            // MCP Servers need to be updated separately
-            await this.$refs.mcp.updateMcp(this.connected);
-        },
-
-        async handleProfileSettingsClick() {
-            alert("Not implemented yet.")
-        },
-
         toggleSidebar() {
             conf.sidebarCollapsed = !conf.sidebarCollapsed;
             this.sidebarCollapsed = conf.sidebarCollapsed; // needed for auto-update
@@ -376,16 +319,12 @@ export default {
     },
     mounted() {
         this.setupResizer();
-        document.addEventListener('click', this.closeProfileMenu);
 
         if (this.isMobile) {
             SidebarManager.close()
         } else {
             SidebarManager.selectView(conf.selectedSidebar, conf.sidebarCollapsed);
         }
-    },
-    beforeUnmount() {
-        document.removeEventListener('click', this.closeProfileMenu);
     },
 }
 </script>
@@ -460,47 +399,6 @@ export default {
     color: white !important;
 }
 
-.sidebar-account-wrapper {
-    position: relative;
-}
-
-.sidebar-account-menu {
-    position: absolute;
-    left: calc(100% + 0.5rem);
-    bottom: 0;
-    min-width: 10rem;
-    padding: 0.35rem;
-    background-color: var(--surface-color);
-    border: 1px solid var(--border-color);
-    border-radius: var(--bs-border-radius);
-    z-index: 1001;
-}
-
-.sidebar-account-menu-button {
-    width: 100%;
-    min-height: 2.25rem;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.45rem 0.65rem;
-    border: 0;
-    border-radius: var(--bs-border-radius-sm);
-    background: transparent;
-    color: var(--text-primary-color);
-    text-align: left;
-    white-space: nowrap;
-}
-
-.sidebar-account-menu-button:hover {
-    background-color: var(--background-color);
-    color: var(--primary-color);
-}
-
-.sidebar-account-menu-button i {
-    width: 1rem;
-    text-align: center;
-}
-
 .sidebar-menu-toggle {
     font-size: 1.25rem;
     cursor: pointer;
@@ -515,22 +413,6 @@ export default {
 
 .sidebar-menu-toggle:hover {
     color: var(--primary-color);
-}
-
-.sidebar-avatar-wrapper {
-    width: 36px;
-    height: 36px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-}
-
-.sidebar-avatar {
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    object-fit: cover;
 }
 
 .resizer {
