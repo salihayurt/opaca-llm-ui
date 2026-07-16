@@ -170,7 +170,7 @@ class BackendClient {
             headers: {
                 'Content-Type': 'multipart/form-data',
                 'Access-Control-Allow-Origin': '*',
-                'Authorization': this.isAuthenticated.value ? `Bearer ${await this.getTokenFn()}` : ``
+                ...(await this.getAuthorizationHeader()),
             }
         }).catch((error: any) => {
             console.error('Upload failed:', error);
