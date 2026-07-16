@@ -10,17 +10,12 @@
 
     <div v-if="!isMobile" class="sidebar-title">
         {{ Localizer.get('sidebar_chats') }}
+        <i class="fa fa-plus ms-auto sidebar-title-action"
+           @click="this.$emit('new-chat')"
+           :title="Localizer.get('chats_new')" />
     </div>
 
     <div class="d-grid gap-2">
-        <!-- "New Chat" button -->
-        <button type="button"
-                class="btn btn-primary py-2 w-100"
-                @click="this.$emit('new-chat')" >
-            <i class="fa fa-pen-to-square" />
-            {{ Localizer.get('chats_new') }}
-        </button>
-
         <!-- "Search" button -->
         <button type="button"
                 class="btn btn-secondary py-2 w-100"

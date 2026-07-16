@@ -5,8 +5,23 @@
 
     <div v-if="!isMobile" class="sidebar-title">
         {{ Localizer.get('sidebar_questions') }}
-        <i class="fa fa-edit ms-auto click-icon"
-           :class="{'click-icon-active': isEditModeActive}"
+        <i v-if="!isEditModeActive"
+           class="fa fa-plus ms-auto sidebar-title-action"
+           :class="{ disabled: !isEditingAllowed }"
+           :aria-disabled="!isEditingAllowed"
+           @click="this.addNewCategory()"
+           :title="Localizer.get('questions_addCategory')" />
+        <i v-else
+           class="fa fa-sync ms-auto sidebar-title-action"
+           :class="{
+               'fa-spin': isRegenerating,
+               disabled: isRegenerating || !isEditingAllowed,
+           }"
+           :aria-disabled="isRegenerating || !isEditingAllowed"
+           @click="autogenerateSampleQuestions()"
+           :title="Localizer.get('questions_regenerate')" />
+        <i class="fa fa-edit click-icon"
+           :class="{ 'click-icon-active': isEditModeActive }"
            @click="isEditModeActive = !isEditModeActive"
            :title="Localizer.get('questions_toggleEditMode')" />
     </div>
@@ -77,24 +92,6 @@
     </AppAccordion>
 
     <div>
-        <!-- autogen questions button -->
-        <button class="btn btn-primary w-100 mt-3" type="button"
-                :disabled="isRegenerating || !isEditingAllowed"
-                v-if="!isEditModeActive"
-                @click="autogenerateSampleQuestions()">
-            <i :class="['fa', 'fa-sync', isRegenerating ? 'fa-spin' : '']" />
-            {{ Localizer.get('questions_regenerate')}}
-        </button>
-
-        <!-- add new category button -->
-        <button class="btn btn-primary w-100 mt-3" type="button"
-                :disabled="!isEditingAllowed"
-                v-if="isEditModeActive"
-                @click="this.addNewCategory()">
-            <i class="fa fa-plus" />
-            <span>{{ Localizer.get('questions_addCategory') }}</span>
-        </button>
-
         <!-- reset to defaults button -->
         <button class="btn btn-danger w-100 mt-3" type="button"
                 :disabled="!isEditingAllowed"

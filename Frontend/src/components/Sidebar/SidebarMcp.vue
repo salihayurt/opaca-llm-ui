@@ -2,6 +2,9 @@
 <div class="container flex-grow-1 overflow-hidden overflow-y-auto">
     <div v-if="!isMobile" class="sidebar-title">
         {{ Localizer.get('sidebar_mcp') }}
+        <i class="fa fa-plus ms-auto sidebar-title-action"
+           @click.stop="addMcp()"
+           :title="Localizer.get('mcp_add')" />
     </div>
 
     <div v-if="this.isLoading">
@@ -91,13 +94,6 @@
             </template>
         </AppAccordion>
     </div>
-    <button type="button"
-            class="btn btn-primary py-2 w-100"
-            @click.stop="addMcp()">
-        <i class="fa fa-plus me-2"></i>
-        {{ Localizer.get("mcp_add") }}
-    </button>
-
     <InputDialogue ref="input" />
 </div>
 

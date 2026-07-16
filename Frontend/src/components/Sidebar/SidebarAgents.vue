@@ -2,6 +2,10 @@
 <div class="container flex-grow-1 overflow-hidden overflow-y-auto">
     <div v-if="!isMobile" class="sidebar-title">
         {{ Localizer.get('sidebar_agents') }}
+        <i v-if="conf.allowContainerManagement && this.isPlatformConnected"
+           class="fa fa-plus ms-auto sidebar-title-action"
+           @click.stop="addContainer()"
+           :title="Localizer.get('agents_deploy')" />
     </div>
 
     <InputDialogue ref="input"/>
@@ -121,13 +125,6 @@
             </template>
         </AppAccordion>
     </div>
-    <button v-if="conf.allowContainerManagement && this.isPlatformConnected"
-            type="button"
-            class="btn btn-primary py-2 w-100"
-            @click.stop="addContainer()">
-        <i class="fa fa-plus me-2"></i>
-        {{ Localizer.get("agents_deploy") }}
-    </button>
 </div>
 
 </template>

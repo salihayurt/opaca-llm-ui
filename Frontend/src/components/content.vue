@@ -30,6 +30,7 @@
             @new-chat="() => this.startNewChat()"
             @delete-file="fileId => this.handleDeleteFile(fileId)"
             @delete-all-files="() => this.handleDeleteAllFiles()"
+            @upload-file="() => this.$refs.fileInput?.click()"
             @view-file="openViewer"
             @rename-file="handleRenameFile"
             @goto-search-result="(chatId, messageId) => this.gotoSearchResult(chatId, messageId)"

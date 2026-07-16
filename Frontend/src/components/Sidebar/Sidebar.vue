@@ -115,6 +115,7 @@
                     v-show="SidebarManager.isViewSelected('files')"
                     @delete-file="fileId => this.$emit('delete-file', fileId)"
                     @delete-all-files="() => this.$emit('delete-all-files')"
+                    @upload-file="() => this.$emit('upload-file')"
                     @view-file="$emit('view-file', $event)"
                     @rename-file="(fileId, newName) => this.$emit('rename-file', fileId, newName)"
                     @update-chats="this.updateChats"
@@ -224,6 +225,7 @@ export default {
         'rename-chat',
         'new-chat',
         'delete-file',
+        'upload-file',
         'view-file',
         'rename-file',
         'goto-search-result',
@@ -320,6 +322,33 @@ export default {
     border-left: 5px solid var(--primary-color);
     padding-left: .5em;
     margin-bottom: .5em;
+}
+
+.sidebar-title-action {
+    flex: 0 0 auto;
+    width: 2rem;
+    height: 2rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    cursor: pointer;
+    background-color: var(--primary-color);
+    color: var(--button-primary-color);
+    font-size: 1rem;
+    transition: all 0.2s ease;
+}
+
+.sidebar-title-action:hover {
+    background-color: var(--secondary-color);
+    transform: translateY(-1px);
+}
+
+.sidebar-title-action.disabled {
+    opacity: .5;
+    cursor: default;
+    pointer-events: none;
+    transform: none;
 }
 
 .sidebar-empty-state {
