@@ -78,6 +78,14 @@
                class="fa fa-question-circle sidebar-menu-item"
                :title="Localizer.get('sidebar_faq')"
                v-bind:class="{'sidebar-menu-item-select': SidebarManager.isViewSelected('faq')}"/>
+
+            <!-- Always Visible: User Profile -->
+            <SidebarAccount
+                v-show="conf.authEnabled"
+                @update-user-info="updateSidebarUserInfo"
+                @update-mcp-servers="$refs.mcp.updateMcp(connected)"
+                ref="account"
+            />
         </div>
 
         <!-- sidebar content -->
@@ -196,6 +204,7 @@ import SidebarChats from "./SidebarChats.vue";
 import SidebarFiles from "./SidebarFiles.vue";
 import SidebarMcp from "./SidebarMcp.vue";
 import SidebarPlayBooks from "./SidebarPlayBooks.vue";
+import SidebarAccount from "./SidebarAccount.vue";
 import backendClient from "../../utils.js";
 
 export default {
@@ -212,6 +221,7 @@ export default {
         SidebarPlayBooks,
         SidebarExtensions,
         SidebarQuestions,
+        SidebarAccount,
     },
     props: {
         connected: Boolean,
@@ -232,7 +242,7 @@ export default {
     ],
     setup() {
         const { isMobile } = useDevice();
-        return { SidebarManager, Localizer, isMobile };
+        return { conf, SidebarManager, Localizer, isMobile };
     },
     data() {
         return {
@@ -298,6 +308,15 @@ export default {
                 this.chats = [];
             }
         },
+
+        async updateSidebarUserInfo() {
+            // All-in-One Place to update user data in the sidebar
+            // Called by App.vue
+            await this.updateChats();
+            await this.$refs.files.updateFiles();
+            await this.$refs.config.fetchMethodConfig();
+            await this.$refs.questions.loadPrompts();
+        }
     },
     mounted() {
         this.setupResizer();
