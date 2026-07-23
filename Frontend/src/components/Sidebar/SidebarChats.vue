@@ -8,7 +8,7 @@
         @goto-search-result="this.gotoSearchResult"
     />
 
-    <div v-if="!isMobile" class="sidebar-title">
+    <div class="sidebar-title">
         {{ Localizer.get('sidebar_chats') }}
         <i class="fa fa-plus ms-auto sidebar-title-action"
            @click="this.$emit('new-chat')"

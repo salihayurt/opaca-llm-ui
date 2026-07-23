@@ -1,6 +1,6 @@
 <template>
     <div class="container flex-grow-1 overflow-hidden overflow-y-auto">
-        <div v-if="!isMobile" class="sidebar-title">
+        <div class="sidebar-title">
             {{ Localizer.get('sidebar_files') }}
             <i class="fa fa-plus ms-auto sidebar-title-action"
                @click="this.$emit('upload-file')"

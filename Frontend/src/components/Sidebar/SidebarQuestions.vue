@@ -3,7 +3,7 @@
 <div class="container flex-grow-1 overflow-hidden overflow-y-auto">
     <InputDialogue ref="editDialog" />
 
-    <div v-if="!isMobile" class="sidebar-title">
+    <div class="sidebar-title">
         {{ Localizer.get('sidebar_questions') }}
         <i v-if="!isEditModeActive"
            class="fa fa-plus ms-auto sidebar-title-action"
