@@ -22,7 +22,8 @@
         <i class="fa fa-circle-notch fa-spin me-1" />
         {{ Localizer.get('agents_loading') }}
     </div>
-    <div v-else-if="platformContainers === null">
+    <div v-else-if="platformContainers === null"
+         class="sidebar-empty-state">
         {{ Localizer.get('general_disconnected') }}
     </div>
     <div v-else-if="platformContainers.length === 0"

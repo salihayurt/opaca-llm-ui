@@ -14,7 +14,7 @@
         {{ Localizer.get('playBooks_loading') }}
     </div>
 
-    <div v-if="errorMessage" class="text-danger mb-2">
+    <div v-if="errorMessage" class="sidebar-empty-state">
         {{ errorMessage }}
     </div>
 
