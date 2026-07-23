@@ -20,6 +20,12 @@
            :aria-disabled="isRegenerating || !isEditingAllowed"
            @click="autogenerateSampleQuestions()"
            :title="Localizer.get('questions_regenerate')" />
+        <i v-if="isEditModeActive"
+           class="fa fa-undo sidebar-title-action sidebar-title-action-danger"
+           :class="{ disabled: !isEditingAllowed }"
+           :aria-disabled="!isEditingAllowed"
+           @click="this.resetPrompts()"
+           :title="Localizer.get('questions_reset')" />
         <i class="fa fa-edit click-icon"
            :class="{ 'click-icon-active': isEditModeActive }"
            @click="isEditModeActive = !isEditModeActive"
@@ -91,16 +97,6 @@
         </template>
     </AppAccordion>
 
-    <div>
-        <!-- reset to defaults button -->
-        <button class="btn btn-danger w-100 mt-3" type="button"
-                :disabled="!isEditingAllowed"
-                v-if="isEditModeActive"
-                @click="this.resetPrompts()">
-            <i class="fa fa-undo" />
-            <span>{{ Localizer.get('questions_reset')}}</span>
-        </button>
-    </div>
 </div>
 </template>
 

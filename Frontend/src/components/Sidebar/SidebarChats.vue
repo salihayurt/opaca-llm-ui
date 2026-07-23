@@ -13,26 +13,22 @@
         <i class="fa fa-plus ms-auto sidebar-title-action"
            @click="this.$emit('new-chat')"
            :title="Localizer.get('chats_new')" />
-    </div>
-
-    <div class="d-grid gap-2">
-        <!-- "Search" button -->
-        <button type="button"
-                class="btn btn-secondary py-2 w-100"
-                @click="this.isSearching = true"
-                :disabled="this.chats.length === 0" >
-            <i class="fa fa-magnifying-glass" />
-            {{ Localizer.get('chats_search') }}
-        </button>
-
-        <!-- "Delete All Chats" button -->
-        <button type="button"
-                class="btn btn-danger py-2 w-100"
-                @click="onDeleteAllChats"
-                :disabled="this.chats.length === 0">
-            <i class="fa fa-trash" />
-            {{ Localizer.get('chats_deleteAll') }}
-        </button>
+        <i v-if="showHeaderActions"
+           class="fa fa-magnifying-glass sidebar-title-action sidebar-title-action-secondary"
+           :class="{ disabled: this.chats.length === 0 }"
+           :aria-disabled="this.chats.length === 0"
+           @click="this.isSearching = true"
+           :title="Localizer.get('chats_search')" />
+        <i v-if="showHeaderActions"
+           class="fa fa-trash sidebar-title-action sidebar-title-action-danger"
+           :class="{ disabled: this.chats.length === 0 }"
+           :aria-disabled="this.chats.length === 0"
+           @click="onDeleteAllChats"
+           :title="Localizer.get('chats_deleteAll')" />
+        <i class="fa sidebar-title-action sidebar-title-action-secondary"
+           :class="showHeaderActions ? 'fa-angle-right' : 'fa-ellipsis'"
+           @click="showHeaderActions = !showHeaderActions"
+           :title="Localizer.get(showHeaderActions ? 'sidebar_lessActions' : 'sidebar_moreActions')" />
     </div>
 
     <!-- List all the chats -->
@@ -79,7 +75,7 @@ export default {
     data() {
         return {
             missedResponseChatIds: [],
-            showChatMenu: false,
+            showHeaderActions: false,
             isSearching: false,
         };
     },

@@ -5,16 +5,11 @@
             <i class="fa fa-plus ms-auto sidebar-title-action"
                @click="this.$emit('upload-file')"
                :title="Localizer.get('files_upload')" />
-        </div>
-
-        <div class="d-grid gap-2 mb-2">
-            <button type="button"
-                    class="btn btn-danger py-2 w-100"
-                    @click="onDeleteAllFiles"
-                    :disabled="Object.keys(files).length === 0">
-                <i class="fa fa-trash" />
-                {{ Localizer.get('files_deleteAll') }}
-            </button>
+            <i class="fa fa-trash sidebar-title-action sidebar-title-action-danger"
+               :class="{ disabled: Object.keys(files).length === 0 }"
+               :aria-disabled="Object.keys(files).length === 0"
+               @click="onDeleteAllFiles"
+               :title="Localizer.get('files_deleteAll')" />
         </div>
 
         <!-- Show info if no files -->

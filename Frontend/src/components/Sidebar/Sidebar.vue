@@ -344,6 +344,24 @@ export default {
     transform: translateY(-1px);
 }
 
+.sidebar-title-action-secondary {
+    background-color: var(--text-secondary-color);
+}
+
+.sidebar-title-action-danger {
+    background-color: var(--text-danger-color);
+}
+
+.sidebar-title-action-secondary:hover {
+    background-color: var(--text-secondary-color);
+    filter: brightness(.9);
+}
+
+.sidebar-title-action-danger:hover {
+    background-color: var(--text-danger-color);
+    filter: brightness(.9);
+}
+
 .sidebar-title-action.disabled {
     opacity: .5;
     cursor: default;

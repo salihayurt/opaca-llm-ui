@@ -2,6 +2,11 @@
 <div class="container flex-grow-1 overflow-hidden overflow-y-auto">
     <div class="sidebar-title">
         {{ Localizer.get('sidebar_extensions') }}
+        <i class="fa fa-refresh ms-auto sidebar-title-action sidebar-title-action-secondary"
+           :class="{ disabled: this.isLoading }"
+           :aria-disabled="this.isLoading"
+           @click.stop="updatePlatformInfo()"
+           :title="Localizer.get('extensions_refresh')" />
     </div>
 
     <div v-if="this.isLoading">
@@ -55,13 +60,6 @@
             </template>
         </AppAccordion>
     </div>
-    <button type="button"
-            class="btn btn-secondary py-2 w-100"
-            @click.stop="updatePlatformInfo()"
-            :disabled="this.isLoading" >
-        <i class="fa fa-refresh" />
-        {{ Localizer.get('extensions_refresh') }}
-    </button>
 </div>
 
 </template>
