@@ -26,8 +26,7 @@
            :aria-disabled="!isEditingAllowed"
            @click="this.resetPrompts()"
            :title="Localizer.get('questions_reset')" />
-        <i class="fa fa-edit click-icon"
-           :class="{ 'click-icon-active': isEditModeActive }"
+        <i class="fa fa-edit sidebar-title-action sidebar-title-action-secondary"
            @click="isEditModeActive = !isEditModeActive"
            :title="Localizer.get('questions_toggleEditMode')" />
     </div>
@@ -166,7 +165,7 @@ export default {
                 generate me exactly ${numQuestions} requests or questions a user could give you. These ${numQuestions} requests or
                 questions should directly reference one or more of your available tools. I want you to
                 provide me your answer as a JSON file and NOTHING ELSE. Your response should look like this
-                
+
                 {
                    '1': {'question': 'Example request...', 'icon': '🪄'},
                    '2': {'question': 'Example request...', 'icon': '🤖'},
@@ -485,11 +484,6 @@ export default {
     background-color: var(--input-color);
     color: var(--text-danger-color);
     transform: translateY(-1px);
-}
-
-.click-icon.click-icon-active {
-    color: var(--primary-color) !important;
-    border: 1px solid var(--primary-color);
 }
 
 .click-icon.disabled {

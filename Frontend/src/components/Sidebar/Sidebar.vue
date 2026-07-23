@@ -318,6 +318,7 @@ export default {
 .sidebar-title {
     display: flex;
     align-items: center;
+    gap: .25rem;
     font-size: 150%;
     border-left: 5px solid var(--primary-color);
     padding-left: .5em;
