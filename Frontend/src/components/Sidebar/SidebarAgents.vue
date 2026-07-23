@@ -37,6 +37,14 @@
             :placeholder="Localizer.get('agents_search')"
             v-model="this.searchQuery"
         />
+        <div v-if="agentSearchContexts.length > 0" class="sidebar-search-results">
+            <div v-for="result in agentSearchContexts"
+                 :key="result.key"
+                 class="sidebar-search-result-group">
+                <div class="sidebar-search-result-heading">{{ result.path }}</div>
+                <div class="sidebar-search-result-context">{{ result.context }}</div>
+            </div>
+        </div>
         <AppAccordion
             id="agents-accordion"
             class="text-start"
@@ -167,6 +175,55 @@ export default {
             searchQuery: '',
             restrictedActions: { forbidden: [], need_confirmation: [] },
         };
+    },
+    computed: {
+        agentSearchContexts() {
+            const query = this.searchQuery.trim().toLowerCase();
+            if (!query || !this.platformContainers) return [];
+
+            const results = [];
+            const matches = value => value?.toLowerCase().includes(query);
+            const excerpt = value => {
+                const text = value ?? '';
+                const index = text.toLowerCase().indexOf(query);
+                if (index < 0) return text;
+                const start = Math.max(0, index - 40);
+                const end = Math.min(text.length, index + query.length + 40);
+                return `${start > 0 ? '…' : ''}${text.slice(start, end)}${end < text.length ? '…' : ''}`;
+            };
+
+            this.platformContainers.forEach(container => {
+                const containerName = container.image?.imageName ?? container.containerId;
+                if (matches(containerName)) {
+                    results.push({
+                        key: `container-${container.containerId}`,
+                        path: containerName,
+                        context: excerpt(containerName),
+                    });
+                }
+
+                container.agents?.forEach(agent => {
+                    if (matches(agent.agentId)) {
+                        results.push({
+                            key: `agent-${container.containerId}-${agent.agentId}`,
+                            path: `${containerName} › ${agent.agentId}`,
+                            context: excerpt(agent.agentId),
+                        });
+                    }
+
+                    agent.actions?.forEach(action => {
+                        if (!matches(action.name) && !matches(action.description)) return;
+                        results.push({
+                            key: `action-${container.containerId}-${agent.agentId}-${action.name}`,
+                            path: `${containerName} › ${agent.agentId} › ${action.name}`,
+                            context: excerpt(matches(action.description) ? action.description : action.name),
+                        });
+                    });
+                });
+            });
+
+            return results;
+        },
     },
     methods: {
         async toggleSearch() {

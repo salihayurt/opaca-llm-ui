@@ -9,7 +9,7 @@
            class="fa fa-magnifying-glass sidebar-title-action sidebar-title-action-secondary"
            :class="{ disabled: this.chats.length === 0 }"
            :aria-disabled="this.chats.length === 0"
-           @click="this.isSearching = !this.isSearching"
+           @click="toggleSearch"
            :title="Localizer.get('chats_search')" />
         <i v-if="showHeaderActions"
            class="fa fa-trash sidebar-title-action sidebar-title-action-danger"
@@ -23,14 +23,39 @@
            :title="Localizer.get(showHeaderActions ? 'sidebar_lessActions' : 'sidebar_moreActions')" />
     </div>
 
-    <SidebarChatSearch
-        v-if="isSearching"
-        @stop-search="this.isSearching = false"
-        @goto-search-result="this.gotoSearchResult"
-    />
+    <div v-if="isSearching">
+        <input v-model="searchQuery"
+               ref="searchBar"
+               type="search"
+               class="form-control my-2"
+               :placeholder="Localizer.get('chats_search')"
+               @input="updateSearchResults"
+               @keyup.enter="updateSearchResults"
+               @keyup.esc="closeSearch" />
+
+        <div v-if="isLoadingResults" class="py-2 text-center text-muted">
+            <i class="fa fa-circle-notch fa-spin" />
+        </div>
+
+        <div v-if="Object.keys(searchResults).length > 0" class="sidebar-search-results">
+            <div v-for="(results, chatId) in searchResults"
+                 :key="chatId"
+                 class="sidebar-search-result-group">
+                <div class="sidebar-search-result-heading">
+                    {{ results?.[0].chat_name }}
+                </div>
+                <div v-for="(result, index) in results"
+                     :key="index"
+                     class="sidebar-search-result-context sidebar-search-result-clickable"
+                     @click="gotoSearchResult(result.chat_id, result.message_id)">
+                    {{ result.excerpt }}
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- List all the chats -->
-    <div v-for="chat in chats" :key="chat.chat_id">
+    <div v-for="chat in visibleChats" :key="chat.chat_id">
         <SidebarChatItem
             :selected-chat-id="this.selectedChatId"
             :chat-id="chat.chat_id"
@@ -47,12 +72,13 @@
 <script>
 import Localizer from "../../Localizer.js";
 import {useDevice} from "../../useIsMobile.js";
+import {nextTick} from "vue";
+import backendClient from "../../utils.js";
 import SidebarChatItem from "./SidebarChatItem.vue";
-import SidebarChatSearch from "../SidebarChatSearch.vue";
 
 export default {
     name: 'SidebarChats',
-    components: {SidebarChatSearch, SidebarChatItem},
+    components: {SidebarChatItem},
     props: {
         selectedChatId: String,
         chats: Array,
@@ -75,13 +101,59 @@ export default {
             missedResponseChatIds: [],
             showHeaderActions: false,
             isSearching: false,
+            searchQuery: '',
+            searchResults: {},
+            isLoadingResults: false,
         };
     },
     methods: {
         toggleHeaderActions() {
             this.showHeaderActions = !this.showHeaderActions;
             if (!this.showHeaderActions) {
-                this.isSearching = false;
+                this.closeSearch();
+            }
+        },
+
+        async toggleSearch() {
+            if (this.isSearching) {
+                this.closeSearch();
+                return;
+            }
+            this.isSearching = true;
+            await nextTick();
+            this.$refs.searchBar?.focus();
+        },
+
+        closeSearch() {
+            this.isSearching = false;
+            this.searchQuery = '';
+            this.searchResults = {};
+            this.isLoadingResults = false;
+        },
+
+        async updateSearchResults() {
+            const query = this.searchQuery;
+            this.searchResults = {};
+
+            if (query.length < 3) {
+                this.isLoadingResults = false;
+                return;
+            }
+
+            this.isLoadingResults = true;
+            try {
+                const results = await backendClient.search(query);
+                if (query !== this.searchQuery) return;
+                this.searchResults = results;
+            } catch (error) {
+                console.error(error);
+                if (query === this.searchQuery) {
+                    this.searchResults = {};
+                }
+            } finally {
+                if (query === this.searchQuery) {
+                    this.isLoadingResults = false;
+                }
             }
         },
 
@@ -107,7 +179,7 @@ export default {
         },
 
         gotoSearchResult(chatId, messageId) {
-            this.isSearching = false;
+            this.closeSearch();
             this.$emit('goto-search-result', chatId, messageId)
         },
 
@@ -117,11 +189,20 @@ export default {
             }
         },
     },
+    computed: {
+        visibleChats() {
+            const query = this.searchQuery.trim().toLowerCase();
+            if (!query) return this.chats;
+
+            const matchingChatIds = new Set(Object.keys(this.searchResults));
+            return this.chats.filter(chat =>
+                chat.name?.toLowerCase().includes(query)
+                || matchingChatIds.has(chat.chat_id)
+            );
+        },
+    },
     mounted() {
         //this.updateChats(); // ... is called in this stage, but moved to App.mounted to fix concurrency issues
     },
 }
 </script>
-
-<style scoped>
-</style>
