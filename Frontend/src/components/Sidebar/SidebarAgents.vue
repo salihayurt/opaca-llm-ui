@@ -55,11 +55,12 @@
                 <i :class="isInternalContainer(containerId) ? 'fa fa-cube me-3' : 'fa fa-box me-3'"/>
                 <strong class="container-name">{{ (image?.name === "" ? null : image?.name) ?? image?.imageName ?? containerId }}</strong>
 
-                <i v-if="conf.allowContainerManagement && !isInternalContainer(containerId)"
-                    class="fa fa-remove delete-icon"
-                    @click.stop.prevent="this.stopContainer(containerId)"
-                    :title="Localizer.get('agents_undeploy')"
-                />
+                <span v-if="conf.allowContainerManagement && !isInternalContainer(containerId)"
+                      class="section-actions">
+                    <i class="fa fa-remove click-icon"
+                       @click.stop.prevent="this.stopContainer(containerId)"
+                       :title="Localizer.get('agents_undeploy')" />
+                </span>
             </template>
 
             <template #body="{ item: {containerId, agents, approvals}, index: containerIndex }">
@@ -575,24 +576,6 @@ export default {
     border-radius: var(--bs-border-radius);
     white-space: pre-wrap; /* Ensures line breaks */
     font-family: monospace;
-}
-
-.delete-icon {
-    flex: 0 0 auto;
-    width: 2em;
-    height: 2em;
-    right: 2rem;
-    top: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: var(--bs-border-radius-lg);
-    cursor: pointer;
-    transition: color 0.2s ease;
-}
-
-.delete-icon:hover {
-    color: var(--text-danger-color);
 }
 
 </style>

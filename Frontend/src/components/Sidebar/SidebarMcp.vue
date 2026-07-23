@@ -24,14 +24,13 @@
         >
             <template #header="{ item: server }">
                 <i class="fa fa-server me-3"/>
-                <strong>{{ server.name }}</strong>
+                <strong class="flex-grow-1">{{ server.name }}</strong>
 
-                <!-- Delete Button -->
-                <i
-                    class="fa fa-remove delete-icon"
-                    @click.stop="this.deleteMcp(server.name)"
-                    :title="Localizer.get('mcp_remove')"
-                />
+                <span class="section-actions">
+                    <i class="fa fa-remove click-icon"
+                       @click.stop="this.deleteMcp(server.name)"
+                       :title="Localizer.get('mcp_remove')" />
+                </span>
             </template>
 
             <template #body="{ item: server, index: mcpServerIndex }">
@@ -322,25 +321,6 @@ export default {
 <style scoped>
 .mcp-body {
     padding: 0.5rem;
-}
-
-.delete-icon {
-    position: absolute;
-    width: 2em;
-    height: 2em;
-    right: 2rem;
-    top: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transform: translateY(-50%);
-    border-radius: var(--bs-border-radius-lg);
-    cursor: pointer;
-    transition: color 0.2s ease;
-}
-
-.delete-icon:hover {
-    color: var(--text-danger-color);
 }
 
 </style>

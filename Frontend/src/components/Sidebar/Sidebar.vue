@@ -370,6 +370,49 @@ export default {
     transform: none;
 }
 
+.click-icon {
+    flex: 0 0 auto;
+    width: 2rem;
+    height: 2rem;
+    font-size: 1rem;
+    padding: 0;
+    margin: 0;
+    aspect-ratio: 1 / 1 !important;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 1rem !important;
+    cursor: pointer;
+    color: var(--text-primary-color);
+}
+
+.click-icon:hover {
+    background-color: var(--input-color);
+    color: var(--text-danger-color);
+    transform: translateY(-1px);
+}
+
+.click-icon.disabled {
+    opacity: 0.5;
+    cursor: default;
+    transform: none;
+    pointer-events: none;
+    color: var(--text-primary-color) !important;
+    background: none !important;
+}
+
+.section-actions .click-icon:hover {
+    background-color: var(--primary-color);
+}
+
+.section-actions .click-icon {
+    margin-right: 0 !important;
+}
+
+.section-actions .click-icon:last-child {
+    margin-right: .75rem !important;
+}
+
 .sidebar-search-results {
     max-height: 12rem;
     overflow-y: auto;

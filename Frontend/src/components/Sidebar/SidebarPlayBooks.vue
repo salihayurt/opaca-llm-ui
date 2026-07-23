@@ -38,12 +38,12 @@
                 {{ playBook.name }}
             </strong>
 
-            <span class="play-book-actions">
-                <i class="fa fa-lg play-book-action"
+            <span class="play-book-actions section-actions">
+                <i class="fa click-icon"
                    :class="playBook.enabled ? 'fa-toggle-on' : 'fa-toggle-off'"
                    @click.stop="togglePlayBook(playBook.id)"
                    :title="Localizer.get(playBook.enabled ? 'playBooks_disable' : 'playBooks_enable')" />
-                <i class="fa fa-remove play-book-action"
+                <i class="fa fa-remove click-icon"
                    @click.stop="deletePlayBook(playBook)"
                    :title="Localizer.get('playBooks_delete')" />
             </span>
@@ -225,32 +225,12 @@ export default {
     align-items: center;
 }
 
-.play-book-action {
-    flex: 0 0 auto;
-    width: 2rem;
-    height: 2rem;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 50%;
-    cursor: pointer;
-    margin-right: 0 !important;
-}
-
-.play-book-action:hover {
-    background-color: var(--input-color);
-}
-
 .fa-toggle-on {
     color: var(--text-success-color);
 }
 
 .fa-toggle-off {
     color: var(--text-secondary-color);
-}
-
-.fa-remove:hover {
-    color: var(--text-danger-color);
 }
 
 .play-book-disabled {

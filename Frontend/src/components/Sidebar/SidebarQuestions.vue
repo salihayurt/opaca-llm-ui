@@ -464,37 +464,6 @@ export default {
     color: var(--text-danger-color);
 }
 
-.click-icon {
-    flex: 0 0 auto;
-    width: 2rem;
-    height: 2rem;
-    font-size: 1rem;
-    padding: 0;
-    margin: 0;
-    aspect-ratio: 1 / 1 !important;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 1rem !important;
-    cursor: pointer;
-    color: var(--text-primary-color);
-}
-
-.click-icon:hover {
-    background-color: var(--input-color);
-    color: var(--text-danger-color);
-    transform: translateY(-1px);
-}
-
-.click-icon.disabled {
-    opacity: 0.5;
-    cursor: default;
-    transform: none;
-    pointer-events: none;
-    color: var(--text-primary-color) !important;
-    background: none !important;
-}
-
 .question-item.disabled {
     opacity: 0.5;
     cursor: default;
@@ -503,9 +472,5 @@ export default {
     color: var(--text-primary-color) !important;
     border-color: var(--border-color) !important;
     background-color: var(--background-color) !important;
-}
-
-.section-actions .click-icon:hover {
-    background-color: var(--primary-color);
 }
 </style>

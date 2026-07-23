@@ -44,11 +44,12 @@
                     variant="nested"
                 >
                     <template #header="{ item: extension }">
-                        {{ extension.description }}
-                        <i class="fa fa-expand extension-expand-button"
-                            @click.stop="this.maximized = extension.fullUrl"
-                            :title="Localizer.get('extensions_expand')"
-                        />
+                        <span class="flex-grow-1">{{ extension.description }}</span>
+                        <span class="section-actions">
+                            <i class="fa fa-expand click-icon"
+                               @click.stop="this.maximized = extension.fullUrl"
+                               :title="Localizer.get('extensions_expand')" />
+                        </span>
                     </template>
 
                     <template #body="{ item: extension }">
@@ -120,21 +121,6 @@ export default {
 <style scoped>
 .extension-body {
     padding: 0.5rem 0;
-}
-
-/* the following are copied from chat tab and search chat overlay... */
-.extension-expand-button {
-    flex: 0 0 auto;
-    width: 2rem;
-    height: 2rem;
-    padding: 0;
-    aspect-ratio: 1 / 1;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    align-self: flex-end;
-    border-radius: 1rem !important;
-    cursor: pointer;
 }
 
 .extension-expand-overlay {
