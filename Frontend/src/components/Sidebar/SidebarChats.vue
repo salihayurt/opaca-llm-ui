@@ -1,13 +1,5 @@
 <template>
 <div class="container flex-grow-1 overflow-hidden overflow-y-auto">
-    <SearchChatsOverlay
-        v-if="isSearching"
-        :is-searching="isSearching"
-        :chats="chats"
-        @stop-search="this.isSearching = false"
-        @goto-search-result="this.gotoSearchResult"
-    />
-
     <div class="sidebar-title">
         {{ Localizer.get('sidebar_chats') }}
         <i class="fa fa-plus ms-auto sidebar-title-action"
@@ -17,7 +9,7 @@
            class="fa fa-magnifying-glass sidebar-title-action sidebar-title-action-secondary"
            :class="{ disabled: this.chats.length === 0 }"
            :aria-disabled="this.chats.length === 0"
-           @click="this.isSearching = true"
+           @click="this.isSearching = !this.isSearching"
            :title="Localizer.get('chats_search')" />
         <i v-if="showHeaderActions"
            class="fa fa-trash sidebar-title-action sidebar-title-action-danger"
@@ -27,9 +19,15 @@
            :title="Localizer.get('chats_deleteAll')" />
         <i class="fa sidebar-title-action sidebar-title-action-secondary"
            :class="showHeaderActions ? 'fa-angle-right' : 'fa-ellipsis'"
-           @click="showHeaderActions = !showHeaderActions"
+           @click="toggleHeaderActions"
            :title="Localizer.get(showHeaderActions ? 'sidebar_lessActions' : 'sidebar_moreActions')" />
     </div>
+
+    <SidebarChatSearch
+        v-if="isSearching"
+        @stop-search="this.isSearching = false"
+        @goto-search-result="this.gotoSearchResult"
+    />
 
     <!-- List all the chats -->
     <div v-for="chat in chats" :key="chat.chat_id">
@@ -50,11 +48,11 @@
 import Localizer from "../../Localizer.js";
 import {useDevice} from "../../useIsMobile.js";
 import SidebarChatItem from "./SidebarChatItem.vue";
-import SearchChatsOverlay from "../SearchChatsOverlay.vue";
+import SidebarChatSearch from "../SidebarChatSearch.vue";
 
 export default {
     name: 'SidebarChats',
-    components: {SearchChatsOverlay, SidebarChatItem},
+    components: {SidebarChatSearch, SidebarChatItem},
     props: {
         selectedChatId: String,
         chats: Array,
@@ -80,6 +78,13 @@ export default {
         };
     },
     methods: {
+        toggleHeaderActions() {
+            this.showHeaderActions = !this.showHeaderActions;
+            if (!this.showHeaderActions) {
+                this.isSearching = false;
+            }
+        },
+
         async updateChats() {
             this.$emit('update-chats');
         },

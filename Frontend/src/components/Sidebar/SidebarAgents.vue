@@ -6,6 +6,14 @@
            class="fa fa-plus ms-auto sidebar-title-action"
            @click.stop="addContainer()"
            :title="Localizer.get('agents_deploy')" />
+        <i class="fa fa-magnifying-glass sidebar-title-action sidebar-title-action-secondary"
+           :class="{
+               'ms-auto': !(conf.allowContainerManagement && this.isPlatformConnected),
+               disabled: this.isLoading || !this.platformContainers || this.platformContainers.length === 0,
+           }"
+           :aria-disabled="this.isLoading || !this.platformContainers || this.platformContainers.length === 0"
+           @click="toggleSearch"
+           :title="Localizer.get('agents_search')" />
     </div>
 
     <InputDialogue ref="input"/>
@@ -22,8 +30,9 @@
         {{ Localizer.get('agents_missing') }}
     </div>
     <div v-else class="flex-row" >
-        <input
-            type="text"
+        <input v-if="isSearching"
+            type="search"
+            ref="searchBar"
             class="form-control my-2"
             :placeholder="Localizer.get('agents_search')"
             v-model="this.searchQuery"
@@ -154,11 +163,22 @@ export default {
         return {
             platformContainers: null,
             isLoading: false,
+            isSearching: false,
             searchQuery: '',
             restrictedActions: { forbidden: [], need_confirmation: [] },
         };
     },
     methods: {
+        async toggleSearch() {
+            this.isSearching = !this.isSearching;
+            if (!this.isSearching) {
+                this.searchQuery = '';
+                return;
+            }
+            await nextTick();
+            this.$refs.searchBar?.focus();
+        },
+
         getEffectiveApproval(agentId, action, approvals) {
             return getEffectiveApproval(`${agentId}--${action.name}`, approvals?.[`${agentId}--${action.name}`], this.restrictedActions);
         },
