@@ -125,6 +125,7 @@
                 <!-- sample questions -->
                 <SidebarQuestions
                     v-show="SidebarManager.isViewSelected('questions')"
+                    :sidebar-view="SidebarManager.getSelectedView()"
                     @select-question="question => this.$emit('select-question', question)"
                     ref="questions"
                 />
