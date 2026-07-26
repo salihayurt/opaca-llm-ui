@@ -334,34 +334,38 @@ export default {
     align-items: center;
     justify-content: center;
     border-radius: 50%;
+    border: 1px solid var(--primary-color);
     cursor: pointer;
-    background-color: var(--primary-color);
-    color: var(--button-primary-color);
+    background-color: transparent;
+    color: var(--primary-color);
     font-size: 1rem;
     transition: all 0.2s ease;
 }
 
 .sidebar-title-action:hover {
-    background-color: var(--secondary-color);
+    background-color: var(--primary-color);
+    color: var(--button-primary-color);
     transform: translateY(-1px);
 }
 
 .sidebar-title-action-secondary {
-    background-color: var(--text-secondary-color);
+    border-color: var(--text-secondary-color);
+    color: var(--text-secondary-color);
 }
 
 .sidebar-title-action-danger {
-    background-color: var(--text-danger-color);
+    border-color: var(--text-danger-color);
+    color: var(--text-danger-color);
 }
 
 .sidebar-title-action-secondary:hover {
     background-color: var(--text-secondary-color);
-    filter: brightness(.9);
+    color: var(--button-primary-color);
 }
 
 .sidebar-title-action-danger:hover {
     background-color: var(--text-danger-color);
-    filter: brightness(.9);
+    color: var(--button-primary-color);
 }
 
 .sidebar-title-action.disabled {
