@@ -1,6 +1,7 @@
 """
 Request and response models used in the FastAPI routes (and in some of the implementations).
 """
+import copy
 from enum import Enum
 import re
 from typing import Callable, Iterable, Set, Literal, Annotated
@@ -407,6 +408,8 @@ class SessionData(BaseModel):
     the server is using the same method for waiting for the webserver to be closed again.
     """
     session_id: str = Field(default_factory=lambda: str(uuid.uuid4()), alias='_id')
+    user_id: str = Field(default="")
+    original_session_id: str = Field(default="")
     chats: Dict[str, Chat] = Field(default_factory=dict)
     config: Dict[str, Any] = Field(default_factory=dict)
     uploaded_files: Dict[str, OpacaFile] = Field(default_factory=dict)
@@ -461,6 +464,22 @@ class SessionData(BaseModel):
 
     def is_valid(self) -> bool:
         return self.valid_until > time.time()
+
+    def create_user_session(self, user_id: str) -> "SessionData":
+        """
+        Creates a new user session instance based on the current anonymous session.
+        """
+        user_session = SessionData(**self.model_dump(exclude={"session_id"}))
+        user_session._websocket = self._websocket
+        user_session._ws_msg_queue = self._ws_msg_queue
+        user_session._ws_out_cache = self._ws_out_cache
+        user_session._opaca_client = self._opaca_client
+        user_session._user_api_keys = copy.deepcopy(self._user_api_keys)
+        user_session.user_id = user_id
+        user_session.original_session_id = self.session_id
+        # Set "valid_until" to year 2100 to avoid deletion of the user session
+        user_session.valid_until = datetime(2100, 1, 1).timestamp()
+        return user_session
 
     def get_config(self, method) -> 'MethodConfig':
         config = self.config.get(method.NAME, method.CONFIG())
