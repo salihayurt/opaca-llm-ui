@@ -292,7 +292,7 @@ export default {
                 // Calculate the new width for the aside
                 const newWidth = event.clientX - sidebar.getBoundingClientRect().left;
 
-                if (newWidth > 200 && newWidth < 768) {
+                if (newWidth >= 275 && newWidth < 768) {
                     sidebar.style.width = `${newWidth}px`;
                 }
             });
@@ -367,6 +367,12 @@ export default {
     transform: translateY(-1px);
 }
 
+.sidebar-title-action.active {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+    color: var(--button-primary-color);
+}
+
 .sidebar-title-action-secondary {
     border-color: var(--text-secondary-color);
     color: var(--text-secondary-color);
@@ -379,6 +385,7 @@ export default {
 
 .sidebar-title-action-secondary:hover {
     background-color: var(--text-secondary-color);
+    border-color: var(--text-secondary-color);
     color: var(--button-primary-color);
 }
 
@@ -480,7 +487,7 @@ export default {
 #sidebar-content {
     width: min(400px, 100vw - 3rem);
     height: calc(100vh - 50px - 1rem - 1rem); /* 100% - header - top margin - bottom margin */
-    min-width: 150px;
+    min-width: min(275px, calc(100vw - 3rem));
     max-width: 768px;
     padding: .5rem;
     margin: 1rem 0 0 1rem;

@@ -27,6 +27,8 @@
            @click="this.resetPrompts()"
            :title="Localizer.get('questions_reset')" />
         <i class="fa fa-edit sidebar-title-action sidebar-title-action-secondary"
+           :class="{ active: isEditModeActive }"
+           :aria-pressed="isEditModeActive"
            @click="isEditModeActive = !isEditModeActive"
            :title="Localizer.get('questions_toggleEditMode')" />
     </div>
