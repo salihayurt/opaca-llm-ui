@@ -3,7 +3,7 @@
          class="container flex-grow-1 overflow-hidden overflow-y-auto"
          @scroll="this.handleDebugScroll">
 
-        <div v-if="!isMobile" class="sidebar-title">
+        <div class="sidebar-title">
             {{ Localizer.get('sidebar_logs') }}
         </div>
 

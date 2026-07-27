@@ -1,21 +1,19 @@
 <template>
     <div class="container flex-grow-1 overflow-hidden overflow-y-auto">
-        <div v-if="!isMobile" class="sidebar-title">
+        <div class="sidebar-title">
             {{ Localizer.get('sidebar_files') }}
-        </div>
-
-        <div class="d-grid gap-2 mb-2">
-            <button type="button"
-                    class="btn btn-danger py-2 w-100"
-                    @click="onDeleteAllFiles"
-                    :disabled="Object.keys(files).length === 0">
-                <i class="fa fa-trash" />
-                {{ Localizer.get('files_deleteAll') }}
-            </button>
+            <i class="fa fa-plus ms-auto sidebar-title-action"
+               @click="this.$emit('upload-file')"
+               :title="Localizer.get('files_upload')" />
+            <i class="fa fa-trash sidebar-title-action sidebar-title-action-danger"
+               :class="{ disabled: Object.keys(files).length === 0 }"
+               :aria-disabled="Object.keys(files).length === 0"
+               @click="onDeleteAllFiles"
+               :title="Localizer.get('files_deleteAll')" />
         </div>
 
         <!-- Show info if no files -->
-        <div v-if="Object.keys(files).length === 0" class="empty-files text-secondary text-sm p-4">
+        <div v-if="Object.keys(files).length === 0" class="sidebar-empty-state">
             {{ Localizer.get('files_missing') }}
         </div>
 
@@ -56,6 +54,7 @@ export default {
     emits: [
         'delete-file',
         'delete-all-files',
+        'upload-file',
         'view-file',
         'rename-file',
         'update-chats',
