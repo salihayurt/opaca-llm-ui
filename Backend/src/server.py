@@ -197,8 +197,8 @@ async def get_platform_info(lang: str, session: SessionData = Depends(handle_ses
         lang = 'GB'
     query = info_queries[lang]
     response = QueryResponse(query=query)
-    actions = await session.opaca_client.get_containers()
-    key = hash(json.dumps([lang, actions], sort_keys=True, ensure_ascii=False, separators=(",", ":")))
+    containers = await session.opaca_client.get_containers()
+    key = hash(json.dumps([lang, [c.model_dump() for c in containers]], sort_keys=True, ensure_ascii=False, separators=(",", ":")))
     if key not in platform_infos:
         internal_tools = InternalTools(session, METHODS['simple-tools'])
         method_impl = METHODS['simple-tools'](session, Chat(chat_id=''), response, False, internal_tools)
