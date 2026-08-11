@@ -1,2 +1,4 @@
 -r ../requirements.txt
 pytest>=9.0.2
+# builds real documents in memory for the text-extraction tests
+fpdf2>=2.8.1

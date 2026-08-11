@@ -15,3 +15,7 @@ langchain-sandbox>=0.0.6
 opaca>=0.0.8
 auth0-fastapi-api>=1.0.0b7
 python-jose[cryptography]>=3.5.0
+pypdf>=6.0.0
+python-docx>=1.1.2
+python-pptx>=1.0.2
+openpyxl>=3.1.5
