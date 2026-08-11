@@ -76,6 +76,7 @@ class SessionDbClient:
             logger.error(f'Invalid data for session {session_id}: {e}')
             await self.delete_session(session_id)
             delete_all_files_from_disk(session_id)
+            await delete_indexed_documents(session_id)
             return None
         except Exception as e:
             logger.error(f'Failed to load session {session_id}: {e}')
@@ -197,7 +198,30 @@ async def delete_session(session_id: str) -> None:
     if session_id in sessions:
         del sessions[session_id]
     delete_all_files_from_disk(session_id)
+    await delete_indexed_documents(session_id)
     await db_client.delete_session(session_id)
+
+
+async def delete_indexed_documents(session_id: str) -> None:
+    """Drop the session's vector collection alongside its files.
+
+    Indexed documents are the embedded form of the same uploads that
+    delete_all_files_from_disk removes, so they have to go at the same time.
+    Without this they outlive the session that owned them, with no owner and
+    no expiry to reclaim them -- and they still hold the document text.
+
+    Failure is logged rather than raised: a session must still be deleted
+    when the vector store is unreachable, otherwise an unavailable optional
+    service blocks cleanup of everything else.
+    """
+    try:
+        from .rag.factory import get_rag_service
+
+        service = await get_rag_service()
+        if service is not None:
+            await service.clear_session(session_id)
+    except Exception as e:
+        logger.error(f'Failed to delete indexed documents for session {session_id}: {e}')
 
 
 async def delete_all_sessions() -> None:
@@ -290,5 +314,8 @@ async def on_shutdown():
         await db_client.client.close()
     else:
         # without DB, sessions are lost on shutdown --> delete all files
+        # and the vectors derived from them, which would otherwise persist in
+        # Qdrant with no session left to own or reclaim them
         for session_id in sessions:
             delete_all_files_from_disk(session_id)
+            await delete_indexed_documents(session_id)

@@ -30,6 +30,7 @@ services:
       - "3001:3001"
     depends_on:
       - session-db
+      - vector-db
     environment:
       TZ: Europe/Berlin
       OPENAI_API_KEY:
@@ -41,6 +42,19 @@ services:
       LLM_MODELS:
       CORS_WHITELIST:
       MONGODB_URI: "mongodb://user:pass@session-db:27017"
+      QDRANT_URL: "http://vector-db:6333"
+      # Document search over uploaded files. Unset variables fall back to the
+      # defaults in Backend/src/rag/service.py; see docs/rag_design.md for what
+      # each one changes and why it defaults the way it does.
+      ENABLE_RAG:
+      EMBEDDING_MODEL:
+      RAG_MIN_INDEX_CHARS:
+      RAG_CONTEXT_BUDGET:
+      RAG_CHUNK_SIZE:
+      RAG_CHUNK_OVERLAP:
+      RAG_MIN_DENSE_SCORE:
+      ENABLE_HYBRID_SEARCH:
+      ENABLE_RERANKING:
       SESSION_ADMIN_PWD:
       LOCATION:
       VITE_AUTH_DOMAIN:
@@ -59,6 +73,16 @@ services:
     volumes:
       - mongodata:/data/db
       - mongoconfig:/data/configdb
+
+  # Qdrant for document embeddings, one collection per session.
+  # Not exposed outside the compose network: it holds document text, and
+  # nothing outside the backend has any reason to reach it.
+  vector-db:
+    image: qdrant/qdrant:v1.15.5
+    ports:
+      - "127.0.0.1:6333:6333"
+    volumes:
+      - qdrantdata:/qdrant/storage
 
   # Optional OPACA platform service
   platform:
@@ -84,4 +108,6 @@ volumes:
   mongoconfig:
     driver: local
   appdata:
+    driver: local
+  qdrantdata:
     driver: local
