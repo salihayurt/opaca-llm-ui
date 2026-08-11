@@ -222,12 +222,17 @@ class DocumentStore:
         *,
         limit: int = 10,
         active_only: bool = True,
+        min_score: float = 0.0,
     ) -> list[StoredChunk]:
         """Return the nearest chunks within one session.
 
         A session with nothing indexed returns an empty list rather than
         raising: asking a question before uploading anything is ordinary use,
         not an error.
+
+        `min_score` is a cosine floor. At 0.0 the nearest chunks are returned
+        whatever their similarity, which is why an unrelated question still
+        gets passages back. See RetrievalConfig.min_dense_score.
         """
         name = collection_name(session_id)
         if not await self.client.collection_exists(name):
@@ -245,6 +250,7 @@ class DocumentStore:
             limit=limit,
             query_filter=query_filter,
             with_payload=True,
+            score_threshold=min_score or None,
         )
         return [_to_stored_chunk(point.payload, point.score) for point in response.points]
 

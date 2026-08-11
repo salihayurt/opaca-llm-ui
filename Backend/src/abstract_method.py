@@ -242,6 +242,10 @@ class AbstractMethod(ABC):
         tools, error = openapi_to_functions(await self.session.opaca_client.get_actions_openapi(inline_refs=True))
 
         if self.internal_tools and include_internal:
+            # Some groups need an await to know what they can offer: the
+            # document tools have to ask the vector store what is indexed
+            # before deciding whether to expose a search tool at all.
+            await self.internal_tools.refresh()
             tools.extend(self.internal_tools.get_internal_tools_openai())
 
         # Filter out OPACA tools if user denied OR if it hits the admin blacklist

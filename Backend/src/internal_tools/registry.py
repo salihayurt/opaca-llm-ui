@@ -11,6 +11,7 @@ For this they have access to the AbstractMethod they are used by.
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING
 
 from ..code_execution import CodeExecutor
@@ -18,6 +19,7 @@ from ..models import InternalTool, ScheduledTask, SessionData
 from .context import InternalToolContext
 from .chats import ChatTools
 from .code_tools import CodeTools
+from .documents import DocumentTools
 from .files import FileTools
 from .play_books import PlayBookTools
 from .scheduling import ScheduledTaskTools
@@ -25,14 +27,17 @@ from .scheduling import ScheduledTaskTools
 if TYPE_CHECKING:
     from ..abstract_method import AbstractMethod
 
+logger = logging.getLogger(__name__)
 
-ToolGroup = PlayBookTools | ScheduledTaskTools | ChatTools | FileTools | CodeTools
+
+ToolGroup = PlayBookTools | ScheduledTaskTools | ChatTools | FileTools | CodeTools | DocumentTools
 TOOL_GROUPS = (
     PlayBookTools,
     ScheduledTaskTools,
     ChatTools,
     FileTools,
     CodeTools,
+    DocumentTools,
 )
 
 
@@ -47,6 +52,25 @@ class InternalTools:
             code_executor=self.code_executor,
         )
         self.groups = [group_cls(self.context) for group_cls in TOOL_GROUPS]
+
+    async def refresh(self) -> None:
+        """Let tool groups reload state before their tools are listed.
+
+        `tools()` is synchronous, but a group may need an await to know what
+        it can offer -- DocumentTools has to ask the vector store which
+        documents are indexed before it can decide whether to expose a search
+        tool at all. A group without a refresh method is skipped.
+        """
+        for group in self.groups:
+            hook = getattr(group, "refresh", None)
+            if hook is None:
+                continue
+            try:
+                await hook()
+            except Exception as error:
+                # One group failing to refresh must not cost the user every
+                # other tool in the turn.
+                logger.warning("Could not refresh %s: %s", group.GROUP_NAME, error)
 
     # FORMAT INTERNAL TOOLS FOR DIFFERENT OCCASIONS
 

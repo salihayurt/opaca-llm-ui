@@ -68,6 +68,18 @@ class RetrievalConfig:
     hybrid: bool = True
     rerank: bool = False
     candidate_pool: int = CANDIDATE_POOL
+
+    # Cosine floor for dense results. Zero means no floor, so an unrelated
+    # question still gets the nearest chunks back and the model is handed
+    # context it should not use.
+    #
+    # A floor is not simply the fix. vector_storage.py has one, and its value
+    # -- squared L2 below 0.3, i.e. cosine above 0.85 -- sits above the band
+    # where genuinely relevant ada-002 pairs fall, so it answers almost
+    # nothing. Too strict and recall dies silently; absent and precision does.
+    # Which value is right is a measurement, not a guess, so the default is
+    # off and this is an ablation axis like the others.
+    min_dense_score: float = 0.0
     min_candidates_to_rerank: int = MIN_CANDIDATES_TO_RERANK
     rrf_k: int = RRF_K
 
@@ -265,7 +277,11 @@ class Retriever:
             result.degraded.append("dense")
             return []
         return await self.store.search(
-            session_id, vector, limit=self.config.candidate_pool, active_only=True
+            session_id,
+            vector,
+            limit=self.config.candidate_pool,
+            active_only=True,
+            min_score=self.config.min_dense_score,
         )
 
     async def _lexical(self, session_id, query, result) -> list[StoredChunk]:

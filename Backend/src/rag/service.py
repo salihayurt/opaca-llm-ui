@@ -49,6 +49,14 @@ def _env_flag(name: str, default: bool) -> bool:
     return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
+def _env_float(name: str, default: float) -> float:
+    try:
+        return float(os.environ.get(name, default))
+    except (TypeError, ValueError):
+        logger.warning("%s is not a number; using %s", name, default)
+        return default
+
+
 def _env_int(name: str, default: int) -> int:
     try:
         return int(os.environ.get(name, default))
@@ -72,6 +80,7 @@ class RagConfig:
     chunk_overlap: int = 50
     hybrid: bool = True
     rerank: bool = False
+    min_dense_score: float = 0.0
 
     @classmethod
     def from_env(cls) -> "RagConfig":
@@ -82,6 +91,7 @@ class RagConfig:
             chunk_overlap=_env_int("RAG_CHUNK_OVERLAP", 50),
             hybrid=_env_flag("ENABLE_HYBRID_SEARCH", True),
             rerank=_env_flag("ENABLE_RERANKING", False),
+            min_dense_score=_env_float("RAG_MIN_DENSE_SCORE", 0.0),
         )
 
 
@@ -152,9 +162,14 @@ class RagService:
         self.retriever = Retriever(
             store,
             embedder,
-            config=RetrievalConfig(hybrid=self.config.hybrid, rerank=self.config.rerank),
+            config=RetrievalConfig(
+                hybrid=self.config.hybrid,
+                rerank=self.config.rerank,
+                min_dense_score=self.config.min_dense_score,
+            ),
             reranker=reranker,
         )
+        self._summaries: dict[str, list[dict]] = {}
 
     # -- indexing ------------------------------------------------------------
 
@@ -218,6 +233,7 @@ class RagService:
         # this document findable by dense search and invisible to keyword
         # search, which reads as retrieval being unreliable.
         self.retriever.invalidate(session_id)
+        self._summaries.pop(session_id, None)
 
         return IndexResult(True, filename, chunks=written)
 
@@ -226,18 +242,35 @@ class RagService:
     async def set_active(self, session_id: str, file_id: str, active: bool) -> None:
         await self.store.set_active(session_id, file_id, active)
         self.retriever.invalidate(session_id)
+        self._summaries.pop(session_id, None)
 
     async def remove_document(self, session_id: str, file_id: str) -> None:
         await self.store.delete_document(session_id, file_id)
         self.retriever.invalidate(session_id)
+        self._summaries.pop(session_id, None)
 
     async def clear_session(self, session_id: str) -> None:
         """Drop everything a session indexed. Called from session teardown."""
         await self.store.delete_session(session_id)
         self.retriever.invalidate(session_id)
+        self._summaries.pop(session_id, None)
 
     async def list_documents(self, session_id: str) -> list[dict]:
-        return await self.store.list_documents(session_id)
+        """Summarise the session's indexed documents, cached.
+
+        The tool layer needs this on every turn, to decide whether to offer a
+        search tool at all and to name the searchable documents in its
+        description. Reading it from the vector store each time would add two
+        scrolls to every message. It is loaded once per session and updated on
+        write instead.
+
+        Loading is lazy rather than eager because collections outlive the
+        process: after a restart, a session's documents are still indexed, and
+        a cache populated only by writes would report none of them.
+        """
+        if session_id not in self._summaries:
+            self._summaries[session_id] = await self.store.list_documents(session_id)
+        return self._summaries[session_id]
 
     # -- retrieval -----------------------------------------------------------
 
