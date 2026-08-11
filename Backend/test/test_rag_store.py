@@ -21,23 +21,6 @@ VECTOR_SIZE = 4
 
 
 @pytest.fixture
-def anyio_backend():
-    """Run these tests on asyncio only.
-
-    anyio's default fixture parametrises over backends, and what it picks
-    depends on the version: 4.10 parametrises over asyncio and trio whether or
-    not trio is installed, while 4.14 only offers backends actually present.
-    Left to the default, the same suite errors on one machine and passes on
-    another.
-
-    Pinning is also the technically correct choice here rather than a
-    workaround: qdrant-client's async client is built on asyncio, so a trio
-    run would be testing a combination that cannot occur in production.
-    """
-    return "asyncio"
-
-
-@pytest.fixture
 async def store():
     """A store backed by a fresh in-memory Qdrant.
 

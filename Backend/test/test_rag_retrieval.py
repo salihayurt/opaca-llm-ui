@@ -22,12 +22,6 @@ from src.rag.store import DocumentStore, StoredChunk
 VECTOR_SIZE = 8
 
 
-@pytest.fixture
-def anyio_backend():
-    """Pin to asyncio; see test_rag_store.py."""
-    return "asyncio"
-
-
 class FakeEmbedder:
     """Deterministic bag-of-characters embedding.
 

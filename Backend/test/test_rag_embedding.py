@@ -19,12 +19,6 @@ from src.rag.embedding import (
 )
 
 
-@pytest.fixture
-def anyio_backend():
-    """Pin to asyncio; see test_rag_store.py for why."""
-    return "asyncio"
-
-
 class FakeProvider:
     """Records calls and returns deterministic vectors derived from the text.
 
