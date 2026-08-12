@@ -60,6 +60,14 @@ class InternalTools:
         it can offer -- DocumentTools has to ask the vector store which
         documents are indexed before it can decide whether to expose a search
         tool at all. A group without a refresh method is skipped.
+
+        Called from each of the three accessors below rather than left to
+        callers. Tools are gathered from four places (AbstractMethod.get_tools,
+        SimpleBackend.get_actions, the orchestrated worker setup, and the
+        /internal-tools route), and a hook that every caller has to remember
+        is a hook that the next caller will forget -- which is exactly what
+        happened when it lived in get_tools alone: the simple method never
+        refreshed, so the document tools were never offered there.
         """
         for group in self.groups:
             hook = getattr(group, "refresh", None)
@@ -91,15 +99,17 @@ class InternalTools:
     def _format_internal_tool_group_simple(self, group: ToolGroup) -> list[dict]:
         return [self._format_internal_tool_simple(tool) for tool in group.tools()]
 
-    def get_internal_tools_simple(self) -> dict[str, list[dict]]:
+    async def get_internal_tools_simple(self) -> dict[str, list[dict]]:
         """return internal tools in simplified OPACA format used by simple agent"""
+        await self.refresh()
         return {
             group.GROUP_NAME: self._format_internal_tool_group_simple(group)
             for group in self.groups if group.tools()
         }
 
-    def get_internal_tools_containers(self) -> list[dict]:
+    async def get_internal_tools_containers(self) -> list[dict]:
         """return internal tools as a pseudo OPACA container for UI display"""
+        await self.refresh()
         agents = [
             {
                 "agentId": group.GROUP_NAME,
@@ -118,8 +128,9 @@ class InternalTools:
             "agents": agents,
         }]
 
-    def get_internal_tools_openai(self) -> list[dict]:
+    async def get_internal_tools_openai(self) -> list[dict]:
         """return internal tools in OpenAI Functions format"""
+        await self.refresh()
         return [
             {
                 "type": "function",

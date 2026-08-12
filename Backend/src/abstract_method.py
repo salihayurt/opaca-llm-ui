@@ -55,6 +55,11 @@ class AbstractMethod(ABC):
         self.tool_counter = count(0)
         self.internal_tools = internal_tools
         self.tool_caller = ToolCaller(session, internal_tools, streaming, chat.chat_id)
+        if internal_tools is not None:
+            # Tools that push their own websocket message need to address it to
+            # a chat. InternalTools is built without one (it is also used
+            # outside a turn), so the current chat is attached here.
+            internal_tools.context.chat_id = chat.chat_id
 
     @classmethod
     def config_schema(cls) -> Dict[str, Any]:
@@ -242,11 +247,7 @@ class AbstractMethod(ABC):
         tools, error = openapi_to_functions(await self.session.opaca_client.get_actions_openapi(inline_refs=True))
 
         if self.internal_tools and include_internal:
-            # Some groups need an await to know what they can offer: the
-            # document tools have to ask the vector store what is indexed
-            # before deciding whether to expose a search tool at all.
-            await self.internal_tools.refresh()
-            tools.extend(self.internal_tools.get_internal_tools_openai())
+            tools.extend(await self.internal_tools.get_internal_tools_openai())
 
         # Filter out OPACA tools if user denied OR if it hits the admin blacklist
         tools = [

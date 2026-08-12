@@ -300,7 +300,7 @@ Now, using the tools available to you and the previous results, continue with yo
                 "GeneralAgent": WorkerAgent("GeneralAgent", "", []),
             }
             if self.internal_tools:
-                worker_agents["InternalToolsAgent"] = WorkerAgent("InternalToolsAgent", "", self.internal_tools.get_internal_tools_openai())
+                worker_agents["InternalToolsAgent"] = WorkerAgent("InternalToolsAgent", "", await self.internal_tools.get_internal_tools_openai())
             
             all_results = []
             rounds = 0
@@ -482,7 +482,7 @@ Please address these specific improvements:
         }
         agent_details["GeneralAgent"] = {"description": GENERAL_AGENT_DESC, "functions": ["GeneralAgent--getGeneralCapabilities"]}
         if self.internal_tools:
-            agent_details["InternalToolsAgent"] = {"description": INTERNAL_AGENT_DESC, "functions": [tool["name"] for tool in self.internal_tools.get_internal_tools_openai()]}
+            agent_details["InternalToolsAgent"] = {"description": INTERNAL_AGENT_DESC, "functions": [tool["name"] for tool in await self.internal_tools.get_internal_tools_openai()]}
         for server_label, server in self.session.mcp_servers.items():
             functions = [tool.get_full_name() for tool in server.tools.values() if tool.approval != 'deny']
             if functions:

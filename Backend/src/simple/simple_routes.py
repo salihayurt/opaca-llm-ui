@@ -129,7 +129,7 @@ class SimpleMethod(AbstractMethod):
         try:
             actions = await self.session.opaca_client.get_actions_simple()
             if self.internal_tools:
-                actions.update(self.internal_tools.get_internal_tools_simple())
+                actions.update(await self.internal_tools.get_internal_tools_simple())
             if self.session.mcp_servers:
                 for server_label, server in self.session.mcp_servers.items():
                     server_actions = []
