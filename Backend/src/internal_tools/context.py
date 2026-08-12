@@ -16,6 +16,13 @@ class InternalToolContext:
     agent_method: type["AbstractMethod"]
     code_executor: CodeExecutor
 
+    # Which chat the current turn belongs to, when there is one. Needed by
+    # tools that push a websocket message of their own, since every message in
+    # that protocol is addressed to a chat. Optional because InternalTools is
+    # also constructed outside a turn -- by the /internal-tools route and when
+    # resuming scheduled tasks -- and those callers have no chat to name.
+    chat_id: str | None = None
+
     async def query(self, query: str) -> QueryResponse:
         """Call AgentMethod.query without streaming, chat history, or internal tools."""
         self.session.is_notifs_aborted = False

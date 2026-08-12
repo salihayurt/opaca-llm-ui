@@ -719,6 +719,23 @@ class ToolResultMessage(BaseModel):
     chat_id: str
 
 
+class DocumentSourcesMessage(BaseModel):
+    """Passages a document search answered from, for the UI to show as sources.
+
+    Sent separately from the tool result rather than embedded in it. The tool
+    result is prose that goes to the model; this is structured data that goes
+    to the frontend. Deriving one from the other means parsing the prose back
+    apart, which breaks silently the first time the wording changes.
+
+    The model is also asked in the tool result to cite passages inline, but
+    that depends on it complying, and the output generator's own prompt
+    governs the final wording. This message does not depend on the model at
+    all: whatever it writes, the user still sees where the answer came from.
+    """
+    sources: List[Dict[str, Any]]
+    chat_id: str
+
+
 class StatusMessage(BaseModel):
     agent: str
     status: str

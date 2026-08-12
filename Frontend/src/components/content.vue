@@ -638,6 +638,13 @@ export default {
                 this.scrollDownDebug();
             }
 
+            if (result.type === "DocumentSourcesMessage") {
+                // Structured data from the backend rather than something
+                // parsed out of the answer, so the panel stays correct
+                // regardless of how the model chose to word its reply.
+                this.getLastBubble()?.setDocumentSources(result.sources);
+            }
+
             if (result.type === "StatusMessage") {
                 const agentName = result.agent;
                 const message = result.status;

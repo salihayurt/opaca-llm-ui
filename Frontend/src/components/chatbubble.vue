@@ -136,6 +136,25 @@
 
             </div>
 
+            <!-- sources a document search answered from -->
+            <div v-if="!this.isLoading && this.documentSources.length > 0"
+                 class="document-sources mt-2">
+                <div class="document-sources-title small">
+                    {{ Localizer.get('chatbubble_sources') }}
+                </div>
+                <div v-for="source in this.documentSources"
+                     :key="source.number"
+                     class="document-source small"
+                     @click.stop="this.$emit('view-file', source.file_id)"
+                     :title="source.filename">
+                    <span class="document-source-number">[{{ source.number }}]</span>
+                    <span class="document-source-name">{{ source.filename }}</span>
+                    <span v-if="source.location" class="document-source-location">
+                        &middot; {{ source.location }}
+                    </span>
+                </div>
+            </div>
+
             <!-- expandable footer menus -->
             <div v-show="!this.isCollapsed">
 
@@ -291,6 +310,10 @@ export default {
             expandedFooter: null,
             isCollapsed: false,
             metrics: {},
+            // Passages a document search answered from. Pushed separately by
+            // the backend rather than parsed out of the answer text, so the
+            // panel is correct whether or not the model cited anything.
+            documentSources: [],
             galleryIndex: 0,
         }
     },
@@ -437,6 +460,10 @@ export default {
 
         setContent(newContent) {
             this.content = newContent;
+        },
+
+        setDocumentSources(sources) {
+            this.documentSources = sources ?? [];
         },
 
         addContent(newContent) {
@@ -625,6 +652,38 @@ export default {
     padding-right: 0.5rem;
     white-space: normal;
     gap: 1rem;
+}
+
+/* Sources a document search answered from. Deliberately quiet: this is
+   provenance, not content, and should not compete with the answer itself. */
+.document-sources {
+    border-top: 1px solid var(--bs-border-color, rgba(128, 128, 128, 0.25));
+    padding-top: 0.4rem;
+}
+
+.document-sources-title {
+    opacity: 0.6;
+    margin-bottom: 0.15rem;
+}
+
+.document-source {
+    opacity: 0.75;
+    cursor: pointer;
+    line-height: 1.5;
+}
+
+.document-source:hover {
+    opacity: 1;
+    text-decoration: underline;
+}
+
+.document-source-number {
+    font-variant-numeric: tabular-nums;
+    margin-right: 0.3rem;
+}
+
+.document-source-location {
+    opacity: 0.7;
 }
 
 .footer-item {
