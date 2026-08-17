@@ -331,6 +331,115 @@ async def test_search_failure_is_reported_not_raised(setup):
     assert "failed" in await tools.tool_search_documents("thermostat")
 
 
+# -- the chat's file selection ----------------------------------------------
+
+def activate(session, chat_id, *files):
+    """Switch the given files on for a chat, as the sidebar does."""
+    chat = session.get_or_create_chat(chat_id, True)
+    chat.active_files = {file.file_id for file in files}
+    return chat
+
+
+@pytest.mark.anyio
+async def test_a_switched_off_document_stops_answering(setup):
+    """SAGE lets a user suspend a file per chat, and file_utils.py already
+    skips suspended files when sending them to a model. A control that appears
+    to do something and does not is worse than no control."""
+    tools, session, _, _ = setup
+    keep = add_file(session, "keep.txt", long_text("thermostat resets"))
+    drop = add_file(session, "drop.txt", long_text("thermostat calibration"))
+    activate(session, "chat-1", keep, drop)
+    await tools.refresh()
+    await tools.tool_search_documents("thermostat")
+
+    activate(session, "chat-1", keep)
+    answer = await tools.tool_search_documents("thermostat")
+
+    assert "keep.txt" in answer
+    assert "drop.txt" not in answer
+
+
+@pytest.mark.anyio
+async def test_the_description_does_not_advertise_switched_off_documents(setup):
+    """Naming a document the tool will not search invites the model to
+    promise an answer it cannot give."""
+    tools, session, _, _ = setup
+    keep = add_file(session, "keep.txt", long_text("thermostats"))
+    add_file(session, "drop.txt", long_text("valves"))
+    activate(session, "chat-1", keep)
+    await tools.refresh()
+
+    description = tools.tools()[0].description
+    assert "keep.txt" in description
+    assert "drop.txt" not in description
+
+
+@pytest.mark.anyio
+async def test_switching_a_document_back_on_needs_no_reindexing(setup):
+    tools, session, _, _ = setup
+    keep = add_file(session, "keep.txt", long_text("thermostat resets"))
+    drop = add_file(session, "drop.txt", long_text("thermostat calibration"))
+    activate(session, "chat-1", keep, drop)
+    await tools.refresh()
+    await tools.tool_search_documents("thermostat")
+
+    activate(session, "chat-1", keep)
+    await tools.tool_search_documents("thermostat")
+
+    activate(session, "chat-1", keep, drop)
+    answer = await tools.tool_search_documents("thermostat")
+    assert "drop.txt" in answer
+    assert "Prepared for search" not in answer
+
+
+@pytest.mark.anyio
+async def test_a_switched_off_document_is_not_indexed(setup):
+    """Indexing costs an embedding call per chunk; a document the user
+    switched off should not incur it."""
+    tools, session, service, _ = setup
+    keep = add_file(session, "keep.txt", long_text("thermostats"))
+    add_file(session, "drop.txt", long_text("valves"))
+    activate(session, "chat-1", keep)
+    await tools.refresh()
+
+    await tools.tool_search_documents("thermostat")
+
+    indexed = {d["filename"] for d in await service.list_documents(session.session_id)}
+    assert indexed == {"keep.txt"}
+
+
+@pytest.mark.anyio
+async def test_everything_is_in_scope_outside_a_chat(setup):
+    """The /internal-tools route and resumed scheduled tasks have no chat to
+    read a selection from."""
+    tools, session, _, _ = setup
+    add_file(session, "manual.txt", long_text("thermostats"))
+    tools.ctx.chat_id = None
+    await tools.refresh()
+
+    assert "manual.txt" in tools.tools()[0].description
+
+
+@pytest.mark.anyio
+async def test_lexical_ranking_is_cached_per_selection(setup):
+    """BM25 scores depend on the corpus: IDF is computed from whatever is
+    indexed, so the same query does not rank the same over two documents and
+    over one of them. A cache keyed by session alone would serve one chat's
+    ranking to a chat with a different selection."""
+    tools, session, service, _ = setup
+    keep = add_file(session, "keep.txt", long_text("thermostat resets"))
+    drop = add_file(session, "drop.txt", long_text("thermostat calibration"))
+    activate(session, "chat-1", keep, drop)
+    await tools.refresh()
+
+    both = await tools.tool_search_documents("thermostat")
+    activate(session, "chat-1", keep)
+    one = await tools.tool_search_documents("thermostat")
+
+    assert "drop.txt" in both
+    assert "drop.txt" not in one
+
+
 # -- sources published to the frontend --------------------------------------
 
 class RecordingSession(SessionData):

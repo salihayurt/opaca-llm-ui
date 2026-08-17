@@ -179,13 +179,20 @@ class LexicalCache:
     scrolls the entire collection and re-tokenises it. Indexing happens rarely
     and queries happen constantly, so the index is built once and invalidated
     on write.
+
+    Entries are keyed by session *and* by which files are in scope. A user can
+    switch files off per chat, and BM25 scores depend on the corpus: the same
+    query over two documents and over one of them does not rank the same, and
+    IDF is computed from whatever is indexed. Caching by session alone would
+    serve one chat's ranking to another chat with a different selection.
     """
 
     def __init__(self):
-        self._entries: dict[str, tuple[BM25Index, list[StoredChunk]]] = {}
+        self._entries: dict[tuple, tuple[BM25Index, list[StoredChunk]]] = {}
 
     def invalidate(self, session_id: str) -> None:
-        self._entries.pop(session_id, None)
+        for key in [k for k in self._entries if k[0] == session_id]:
+            del self._entries[key]
 
     def clear(self) -> None:
         self._entries.clear()
@@ -194,11 +201,15 @@ class LexicalCache:
         self,
         store: DocumentStore,
         session_id: str,
+        file_ids: set[str] | None = None,
     ) -> tuple[BM25Index, list[StoredChunk]]:
-        if session_id not in self._entries:
-            chunks = await store.iter_chunks(session_id, active_only=True)
-            self._entries[session_id] = (BM25Index.build([c.text for c in chunks]), chunks)
-        return self._entries[session_id]
+        key = (session_id, None if file_ids is None else tuple(sorted(file_ids)))
+        if key not in self._entries:
+            chunks = await store.iter_chunks(
+                session_id, active_only=True, file_ids=file_ids
+            )
+            self._entries[key] = (BM25Index.build([c.text for c in chunks]), chunks)
+        return self._entries[key]
 
 
 class Retriever:
@@ -229,21 +240,26 @@ class Retriever:
         query: str,
         *,
         limit: int = 10,
+        file_ids: set[str] | None = None,
     ) -> RetrievalResult:
-        """Retrieve the chunks most relevant to `query` within one session."""
+        """Retrieve the chunks most relevant to `query` within one session.
+
+        `file_ids` narrows the search to particular documents; None searches
+        everything indexed for the session.
+        """
         if not query or not query.strip():
             return RetrievalResult(chunks=[])
 
         result = RetrievalResult(chunks=[])
         rankings: list[list[StoredChunk]] = []
 
-        dense = await self._dense(session_id, query, result)
+        dense = await self._dense(session_id, query, result, file_ids)
         if dense:
             rankings.append(dense)
             result.stages.append("dense")
 
         if self.config.hybrid:
-            lexical = await self._lexical(session_id, query, result)
+            lexical = await self._lexical(session_id, query, result, file_ids)
             if lexical:
                 rankings.append(lexical)
                 result.stages.append("lexical")
@@ -266,7 +282,7 @@ class Retriever:
 
     # -- stages --------------------------------------------------------------
 
-    async def _dense(self, session_id, query, result) -> list[StoredChunk]:
+    async def _dense(self, session_id, query, result, file_ids=None) -> list[StoredChunk]:
         try:
             vector = await self.embedder.embed_query(query)
         except Exception as error:
@@ -282,11 +298,12 @@ class Retriever:
             limit=self.config.candidate_pool,
             active_only=True,
             min_score=self.config.min_dense_score,
+            file_ids=file_ids,
         )
 
-    async def _lexical(self, session_id, query, result) -> list[StoredChunk]:
+    async def _lexical(self, session_id, query, result, file_ids=None) -> list[StoredChunk]:
         try:
-            index, chunks = await self.cache.get(self.store, session_id)
+            index, chunks = await self.cache.get(self.store, session_id, file_ids)
         except Exception as error:
             logger.warning("Lexical retrieval unavailable: %s", error)
             result.degraded.append("lexical")

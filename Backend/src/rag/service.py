@@ -281,9 +281,16 @@ class RagService:
         *,
         limit: int = 10,
         budget_tokens: int | None = None,
+        file_ids: set[str] | None = None,
     ) -> SearchResult:
-        """Retrieve context for `query`, trimmed to the prompt budget."""
-        result = await self.retriever.retrieve(session_id, query, limit=limit)
+        """Retrieve context for `query`, trimmed to the prompt budget.
+
+        `file_ids` restricts the search to particular documents; None searches
+        everything indexed for the session.
+        """
+        result = await self.retriever.retrieve(
+            session_id, query, limit=limit, file_ids=file_ids
+        )
         if not result.chunks:
             return SearchResult(context="", degraded=result.degraded)
 

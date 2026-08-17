@@ -383,5 +383,6 @@ async def test_invalidating_one_session_leaves_others_cached(store, anyio_backen
     await retriever.retrieve("s2", "thermostat")
 
     cache.invalidate("s1")
-    assert "s1" not in cache._entries
-    assert "s2" in cache._entries
+    sessions_cached = {key[0] for key in cache._entries}
+    assert "s1" not in sessions_cached
+    assert "s2" in sessions_cached

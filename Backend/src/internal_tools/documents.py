@@ -105,16 +105,41 @@ class DocumentTools:
     def _session_id(self) -> str:
         return self.ctx.session.session_id
 
+    def _active_file_ids(self) -> set[str] | None:
+        """Which uploaded files the current chat has switched on.
+
+        SAGE lets a user suspend individual files per chat, and file_utils.py
+        already skips suspended files when sending them to a model. Retrieval
+        has to skip them too: a file the user switched off that keeps
+        answering questions is worse than no control at all, because the
+        control appears to do something and does not.
+
+        Returns None outside a chat -- the /internal-tools route and resumed
+        scheduled tasks have no chat to read a selection from -- in which case
+        everything indexed is in scope.
+        """
+        chat_id = self.ctx.chat_id
+        if not chat_id:
+            return None
+        chat = self.ctx.session.chats.get(chat_id)
+        if chat is None:
+            return None
+        return set(chat.active_files)
+
     def _searchable_files(self) -> list[str]:
         """Names of uploaded files this tool could answer from.
 
         Includes files that are not indexed yet: the tool indexes on demand,
-        so from the model's side there is no difference.
+        so from the model's side there is no difference. Files the current
+        chat has switched off are excluded, so the tool description does not
+        advertise documents it will not search.
         """
+        active = self._active_file_ids()
         return sorted(
             file.file_name
             for file in self.ctx.session.uploaded_files.values()
             if is_extractable(file.file_name)
+            and (active is None or file.file_id in active)
         )
 
     async def refresh(self) -> None:
@@ -149,7 +174,9 @@ class DocumentTools:
         notes = await self._index_pending()
 
         try:
-            result = await self.service.search(self._session_id(), query)
+            result = await self.service.search(
+                self._session_id(), query, file_ids=self._active_file_ids()
+            )
         except Exception as error:
             logger.warning("Document search failed: %s", error)
             return f"The document search failed: {error}"
@@ -210,10 +237,13 @@ class DocumentTools:
         slow first search is explained rather than silent.
         """
         already = {document["file_id"] for document in self._indexed}
+        active = self._active_file_ids()
         pending = [
             file
             for file in self.ctx.session.uploaded_files.values()
-            if file.file_id not in already and is_extractable(file.file_name)
+            if file.file_id not in already
+            and is_extractable(file.file_name)
+            and (active is None or file.file_id in active)
         ]
         if not pending:
             return ""

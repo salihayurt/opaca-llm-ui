@@ -223,6 +223,7 @@ class DocumentStore:
         limit: int = 10,
         active_only: bool = True,
         min_score: float = 0.0,
+        file_ids: set[str] | None = None,
     ) -> list[StoredChunk]:
         """Return the nearest chunks within one session.
 
@@ -233,17 +234,25 @@ class DocumentStore:
         `min_score` is a cosine floor. At 0.0 the nearest chunks are returned
         whatever their similarity, which is why an unrelated question still
         gets passages back. See RetrievalConfig.min_dense_score.
+
+        `file_ids` restricts the search to particular documents. SAGE lets a
+        user switch individual files off per chat, and file_utils.py already
+        honours that when sending files to a model; retrieval has to honour it
+        too, or a file the user switched off keeps answering questions.
         """
         name = collection_name(session_id)
         if not await self.client.collection_exists(name):
             return []
 
-        query_filter = (
-            models.Filter(must=[models.FieldCondition(
-                key="active", match=models.MatchValue(value=True))])
-            if active_only
-            else None
-        )
+        conditions = []
+        if active_only:
+            conditions.append(models.FieldCondition(
+                key="active", match=models.MatchValue(value=True)))
+        if file_ids is not None:
+            conditions.append(models.FieldCondition(
+                key="file_id", match=models.MatchAny(any=sorted(file_ids))))
+        query_filter = models.Filter(must=conditions) if conditions else None
+
         response = await self.client.query_points(
             collection_name=name,
             query=query_vector,
@@ -259,6 +268,7 @@ class DocumentStore:
         session_id: str,
         *,
         active_only: bool = True,
+        file_ids: set[str] | None = None,
     ) -> list[StoredChunk]:
         """Return every chunk in a session, for lexical search over payloads.
 
@@ -268,12 +278,14 @@ class DocumentStore:
         if not await self.client.collection_exists(name):
             return []
 
-        scroll_filter = (
-            models.Filter(must=[models.FieldCondition(
-                key="active", match=models.MatchValue(value=True))])
-            if active_only
-            else None
-        )
+        conditions = []
+        if active_only:
+            conditions.append(models.FieldCondition(
+                key="active", match=models.MatchValue(value=True)))
+        if file_ids is not None:
+            conditions.append(models.FieldCondition(
+                key="file_id", match=models.MatchAny(any=sorted(file_ids))))
+        scroll_filter = models.Filter(must=conditions) if conditions else None
 
         collected: list[StoredChunk] = []
         offset = None
