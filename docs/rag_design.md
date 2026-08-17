@@ -136,6 +136,144 @@ because a silently disabled stage produces a row identical to the baseline and
 invites the conclusion "this feature does nothing". The harness must detect
 fallbacks and mark such rows invalid.
 
+## 6b. Measured results
+
+Two documents, English and German GDPR, 17 and 7 usable questions. Retrieval
+only, no generated answers. Small numbers: a difference of 0.05 here is
+noise, and only the large and consistent movements are reported as findings.
+
+### English, n=17
+
+| Configuration | R@1 | R@3 | R@10 | MRR | answerable |
+|---|---|---|---|---|---|
+| baseline (as written) | 0.118 | 0.118 | 0.118 | 0.118 | **0.118** |
+| baseline, threshold removed | 0.353 | 0.706 | 0.765 | 0.515 | 1.000 |
+| hybrid, 150 tokens | 0.235 | 0.471 | 0.588 | 0.342 | 1.000 |
+| hybrid, 300 tokens | 0.235 | 0.471 | 0.588 | 0.356 | 1.000 |
+| hybrid, 500 tokens | 0.294 | 0.529 | 0.647 | 0.431 | 1.000 |
+| **hybrid, 800 tokens** | **0.353** | 0.529 | **0.706** | **0.474** | 1.000 |
+| dense only, 300 tokens | 0.294 | 0.353 | 0.588 | 0.366 | 1.000 |
+| floor 0.20 / 0.30 | 0.235 | 0.471 | 0.588 | 0.356 | 1.000 |
+| floor 0.40 | 0.235 | 0.412 | 0.588 | 0.335 | 1.000 |
+
+### German, n=7
+
+| Configuration | R@1 | R@3 | R@10 | MRR | answerable |
+|---|---|---|---|---|---|
+| baseline (as written) | 0.000 | 0.000 | 0.000 | 0.000 | **0.143** |
+| baseline, threshold removed | 0.429 | 0.571 | 0.571 | 0.500 | 1.000 |
+| hybrid, 150 tokens | 0.429 | 0.714 | 0.857 | 0.595 | 1.000 |
+| hybrid, 300 tokens | 0.429 | 0.714 | 0.857 | 0.560 | 1.000 |
+| hybrid, 500 tokens | 0.429 | **0.857** | 0.857 | 0.619 | 1.000 |
+| **hybrid, 800 tokens** | 0.429 | **0.857** | 0.857 | **0.643** | 1.000 |
+| dense only, 300 tokens | 0.286 | 0.429 | 0.714 | 0.398 | 1.000 |
+| floor 0.20 / 0.30 / 0.40 | 0.429 | 0.714 | 0.857 | 0.560 | 1.000 |
+
+### What the numbers settle
+
+**The baseline's threshold is the finding, and it is worse than Section 5
+supposed.** It returns nothing at all for 15 of 17 English questions and 6 of
+7 German ones. In German it never once retrieves the right article: R@1
+through R@10 are all zero. Removing the cut-off and changing nothing else
+takes MRR from 0.118 to 0.515 in English and from 0.000 to 0.500 in German.
+The mechanism is confirmed -- squared L2 below 0.3 is cosine above 0.85, and
+relevant ada-002 pairs mostly sit below it.
+
+This also fixes how the comparison should be stated. Against the baseline as
+written, everything here looks transformative. Against the baseline with its
+threshold removed, the honest claim is narrower and depends on the language:
+in English the new pipeline is behind on recall (R@3 0.529 against 0.706) and
+behind on MRR (0.474 against 0.515); in German it is ahead on both (0.857
+against 0.571, MRR 0.643 against 0.500).
+
+**Larger chunks win, in both languages, against the design and against the TU
+Berlin ablation.** Section 4.1 committed to ~300 tokens on the strength of a
+study where small chunks won everywhere. Here MRR rises monotonically with
+chunk size in English (0.342, 0.356, 0.431, 0.474 at 150, 300, 500, 800) and
+in German (0.595, 0.560, 0.619, 0.643). Two languages agreeing is harder to
+dismiss than one document.
+
+The likely reason is structural: GDPR articles are long, and a 300-token
+window cuts one in half so neither piece carries the whole provision. That
+makes it a property of this document rather than of retrieval in general, and
+a maintenance manual with short procedural sections could well reverse it
+again. The default stays at 300 for now, but it is now known to be wrong for
+at least one realistic document type, and chunk size is the first axis to
+sweep on any new corpus.
+
+**Hybrid retrieval earns its place in German and not in English.** English:
+R@3 0.471 hybrid against 0.353 dense, MRR 0.356 against 0.366 -- within
+noise. German: R@3 0.714 against 0.429, MRR 0.560 against 0.398 -- a real
+gap. The likely reason is compounds: a term like 'Kohaerenzverfahren' is rare
+in embedding space and exact for BM25, which is the case hybrid retrieval
+exists for. Hybrid stays on, and the German result is the evidence for it.
+
+**The relevance floor does nothing.** 0.20 and 0.30 are identical to no floor
+in both languages; 0.40 costs a little in English and nothing in German.
+`min_dense_score` stays off, and the question moves from what value to set to
+whether the mechanism is worth keeping at all.
+
+### What the numbers cannot settle
+
+**The compound-word question is not answered.** All three surviving German
+compound questions score 1.000 under every configuration including dense-only,
+which says only that three questions were easy. Seven of the ten compound
+questions were dropped in verification, and the ones that survived may well be
+the ones the extraction damaged least. Section 8 stays open.
+
+**Reranking is untested.** No cross-encoder is implemented, so it is absent
+from the grid. The English results give it a target -- semantic questions
+score R@3 0.250 against 0.750 for lexical, so ranking is where the loss is --
+but choosing a reranker on 17 questions would be the same mistake as tuning
+the extraction repair on three examples.
+
+**Sample sizes are small enough to mislead.** Seventeen and seven questions,
+one document each. The English and German sets are not translations of each
+other, so a difference between the languages could be a difference between the
+question sets. What survives that caveat is the direction of the chunk-size
+effect, which is consistent across both, and the baseline threshold result,
+which is too large to be noise.
+
+### A note on how the extraction repair was settled
+
+Worth recording because the process went wrong first. The repair was tuned
+five times against handfuls of examples, and the measured result went 17
+usable questions, then 12, then 11 -- worse at every step. Each round fixed
+the example in front of it and broke something the examples did not cover: a
+ceiling that stops 'direct or' becoming 'director' also refuses
+'a ufsichtsbehoerden', which is the commonest shape of the defect in German.
+
+Swept against both documents, the settings order clearly:
+
+| Setting | English | German |
+|---|---|---|
+| no ceiling | 17/24 | 7/16 |
+| ceiling 7.0 | 16/24 | 7/16 |
+| ceiling 6.5 | 12/24 | 3/16 |
+| ceiling 6.5, stronger document evidence | 11/24 | 2/16 |
+| no repair at all | 1/24 | 0/16 |
+
+The setting now in use is the first row, which is where the code was three
+rounds of tuning ago. The wrong joins the ceiling prevents are real but
+cheap: 'director indirect' damages one word and leaves the passage findable,
+while a refused repair can remove a passage from reach entirely, because the
+terms it would be found by no longer exist as tokens.
+
+Raising the score given to document-supplied vocabulary, added on the
+reasoning that German terms of art score zero in any frequency list, made
+things worse in both languages and much worse in German. It let a term the
+document happens to contain outrank the pieces of a join that should not
+happen.
+
+### What these numbers cannot say
+
+Twelve questions on one document in one language. Confidence intervals on
+proportions this small are wide enough that a 0.08 difference is noise. The
+German set has not run at all, so the compound-word question in Section 8
+remains entirely open. Reranking is absent from the grid because no
+cross-encoder is implemented -- the decision to build one waits on a question
+set where ranking quality is measurable, which this is not.
+
 ## 7. Cost model
 
 Projected, to be replaced after the evaluation run. Recorded here so the
