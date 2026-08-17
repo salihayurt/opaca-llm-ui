@@ -41,6 +41,29 @@ DEFAULT_MIN_INDEX_CHARS = 20_000
 # around 13k tokens on a simple question before any document is involved.
 DEFAULT_CONTEXT_BUDGET = 2_000
 
+# Chunk size, set by measurement rather than by the ablation this design
+# originally followed. That study found small chunks winning everywhere and
+# the design committed to ~300 on its authority; all three documents measured
+# here disagree, and they disagree in the same direction.
+#
+#   MRR by chunk size      100    150    300    500    800   1200
+#   GDPR English                 0.342  0.356  0.431  0.474
+#   GDPR German                  0.595  0.560  0.619  0.643
+#   XR-400 manual        0.443  0.584  0.714  0.760  0.730  0.693
+#
+# The peak sits between 500 and 800 on every one of them, including a manual
+# of short procedural sections that was expected to reverse the effect and did
+# not. 500 is chosen over 800 because it is the better of the two on the
+# document with the most questions, and because smaller chunks leave more room
+# under the context budget.
+#
+# Not settled for every document. The manual falls away again by 1200, so the
+# useful range has an upper edge, and where it sits presumably depends on how
+# self-contained a section is. Worth re-running benchmark/rag_eval on a new
+# corpus before assuming it transfers.
+DEFAULT_CHUNK_TOKENS = 500
+DEFAULT_CHUNK_OVERLAP = 75
+
 
 def _env_flag(name: str, default: bool) -> bool:
     value = os.environ.get(name)
@@ -76,8 +99,8 @@ class RagConfig:
 
     min_index_chars: int = DEFAULT_MIN_INDEX_CHARS
     context_budget_tokens: int = DEFAULT_CONTEXT_BUDGET
-    chunk_tokens: int = 300
-    chunk_overlap: int = 50
+    chunk_tokens: int = DEFAULT_CHUNK_TOKENS
+    chunk_overlap: int = DEFAULT_CHUNK_OVERLAP
     hybrid: bool = True
     rerank: bool = False
     min_dense_score: float = 0.0
@@ -87,8 +110,8 @@ class RagConfig:
         return cls(
             min_index_chars=_env_int("RAG_MIN_INDEX_CHARS", DEFAULT_MIN_INDEX_CHARS),
             context_budget_tokens=_env_int("RAG_CONTEXT_BUDGET", DEFAULT_CONTEXT_BUDGET),
-            chunk_tokens=_env_int("RAG_CHUNK_SIZE", 300),
-            chunk_overlap=_env_int("RAG_CHUNK_OVERLAP", 50),
+            chunk_tokens=_env_int("RAG_CHUNK_SIZE", DEFAULT_CHUNK_TOKENS),
+            chunk_overlap=_env_int("RAG_CHUNK_OVERLAP", DEFAULT_CHUNK_OVERLAP),
             hybrid=_env_flag("ENABLE_HYBRID_SEARCH", True),
             rerank=_env_flag("ENABLE_RERANKING", False),
             min_dense_score=_env_float("RAG_MIN_DENSE_SCORE", 0.0),

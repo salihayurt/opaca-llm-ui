@@ -43,7 +43,7 @@ any format.
 
 | Stage | Choice | Why |
 |---|---|---|
-| Chunking | ~300 tokens, boundary-aware | Small chunks won everywhere; `parent1024/256` scored all-hops@1k = 0.0000. Chunker mattered more than retriever |
+| Chunking | ~500 tokens, boundary-aware | Set by measurement, not by the ablation. See 6b: the peak sits between 500 and 800 on all three documents, and 300 is below the useful range on every one |
 | Contextual chunking | On, async, flagged | 67% retrieval-failure reduction reported by Anthropic. Manual chunks are context-poor: *"hold the button for 3 seconds"* matches nothing on its own |
 | Retrieval | Hybrid dense + BM25, RRF | Dense-only was weakest on both benchmarks. SAGE queries are full of ids and codes (`room 7`, `E14`) that embeddings compress away |
 | Reranking | On, adaptive, flagged | Improved every QASPER config; degraded MultiHop (0.4299 → 0.3122). Single-document questions dominate, so default on — but skip below a chunk-count threshold |
@@ -212,6 +212,56 @@ exists for. Hybrid stays on, and the German result is the evidence for it.
 in both languages; 0.40 costs a little in English and nothing in German.
 `min_dense_score` stays off, and the question moves from what value to set to
 whether the mechanism is worth keeping at all.
+
+### Third document: a maintenance manual, n=27
+
+Run to test whether the chunk-size result was a property of the GDPR rather
+than of retrieval. The document is the opposite shape -- short procedural
+sections, code tables, a glossary, an FAQ -- and being a DOCX it has no
+extraction damage, so all 27 questions verify.
+
+| Configuration | R@1 | R@3 | R@10 | MRR | answerable |
+|---|---|---|---|---|---|
+| baseline (as written) | 0.000 | 0.000 | 0.000 | 0.000 | **0.000** |
+| baseline, threshold removed | 0.222 | 0.630 | 0.963 | 0.441 | 1.000 |
+| hybrid, 100 tokens | 0.333 | 0.444 | 0.815 | 0.443 | 1.000 |
+| hybrid, 150 tokens | 0.444 | 0.630 | 0.926 | 0.584 | 1.000 |
+| hybrid, 300 tokens | 0.519 | 0.926 | 1.000 | 0.714 | 1.000 |
+| **hybrid, 500 tokens** | 0.593 | 0.889 | 1.000 | **0.760** | 1.000 |
+| hybrid, 800 tokens | 0.556 | **0.963** | 1.000 | 0.730 | 1.000 |
+| hybrid, 1200 tokens | 0.519 | 0.815 | 1.000 | 0.693 | 1.000 |
+| **dense only, 300 tokens** | **0.667** | 0.926 | 1.000 | **0.810** | 1.000 |
+| floor 0.40 | 0.630 | 0.963 | 1.000 | 0.781 | 1.000 |
+
+**The baseline retrieves nothing at all.** Not a low score: `answerable =
+0.000`, no chunk returned for any of 27 questions. Two of its defects
+compound here. Its 500-word windows put 20,000 characters into 8 chunks, each
+covering three sections, so each embedding sits near the average of unrelated
+material. Its threshold then demands cosine above 0.85, which such an average
+never reaches against a short specific query. Removing the threshold alone
+takes MRR from 0.000 to 0.441.
+
+**The chunk-size hypothesis was wrong.** The GDPR result was explained as
+long articles being cut in half by a 300-token window, which predicted the
+effect would weaken on a document of short sections. It does not: MRR rises
+0.443, 0.584, 0.714, 0.760 at 100, 150, 300, 500 tokens, peaks around 500 and
+falls again by 1200. The same shape as the GDPR, on a document built the
+opposite way.
+
+Three documents now agree that 300 tokens is below the useful range and that
+the peak sits somewhere around 500 to 800. The design committed to ~300 on
+the strength of an ablation over different corpora, and every corpus measured
+here disagrees. That is enough to change the default.
+
+**Dense-only beats hybrid on this document**, MRR 0.810 against 0.714, and
+the gap is entirely in the semantic category: 0.833 against 0.486. This is
+the third different answer to the same question -- English GDPR called it a
+tie, German favoured hybrid, this favours dense. The pattern that fits all
+three is that BM25 helps where queries carry rare exact terms and hurts where
+they are paraphrases, and which of those dominates is a property of the
+questions users ask rather than of the pipeline. Hybrid stays on, since it is
+never far behind and is well ahead on German compounds, but it is not the
+free improvement the design assumed.
 
 ### What the numbers cannot settle
 
