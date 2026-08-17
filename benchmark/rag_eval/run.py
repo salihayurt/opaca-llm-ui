@@ -50,7 +50,10 @@ from src.text_extraction import extract_segments
 
 from baseline import BaselineStore
 from metrics import QuestionResult, aggregate, format_scores, score_question
-from questions import ALL
+import questions as gdpr_questions
+import questions_manual as manual_questions
+
+ALL = gdpr_questions.ALL
 
 
 @dataclass(frozen=True)
@@ -73,10 +76,17 @@ GRID = [
     # centre
     Config("hybrid-300"),
 
-    # chunk size
+    # chunk size. The wide spread is the point: the GDPR run found larger
+    # chunks winning monotonically, and the suspicion is that this follows the
+    # length of a section rather than being a property of retrieval. A manual
+    # with short procedural sections should show a different shape, and 1200
+    # is included because at that size a single chunk swallows several
+    # sections of this document whole.
+    Config("hybrid-100", chunk_tokens=100, chunk_overlap=20),
     Config("hybrid-150", chunk_tokens=150, chunk_overlap=25),
     Config("hybrid-500", chunk_tokens=500, chunk_overlap=50),
     Config("hybrid-800", chunk_tokens=800, chunk_overlap=80),
+    Config("hybrid-1200", chunk_tokens=1200, chunk_overlap=100),
 
     # retrieval mode
     Config("dense-only", hybrid=False),
@@ -216,7 +226,12 @@ async def main() -> int:
     parser.add_argument("--dry-run", action="store_true",
                         help="verify the question set against the document and stop")
     parser.add_argument("--skip-baseline", action="store_true")
+    parser.add_argument("--questions", choices=("gdpr", "manual"), default="gdpr",
+                        help="which question set to score against")
     args = parser.parse_args()
+
+    global ALL
+    ALL = manual_questions.ALL if args.questions == "manual" else gdpr_questions.ALL
 
     text, segments = await load_document(args.document)
     print(f"document: {args.document.name}")

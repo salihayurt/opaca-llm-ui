@@ -16,11 +16,13 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-# "Article 33", "Artikel 33", "Article 33(1)", "Art. 33"
+# "Article 33", "Artikel 33", "Art. 33", and for manuals "Section 7" or a
+# bare numbered heading such as "7. Error Codes" at the start of a line.
 _ARTICLE = re.compile(
-    r"\b(?:article|artikel|art\.?)\s*(\d{1,3})\b",
+    r"\b(?:article|artikel|art\.?|section|kapitel)\s*(\d{1,3})\b",
     re.IGNORECASE,
 )
+_HEADING = re.compile(r"(?:^|\n)\s*(\d{1,3})\.\s+[A-Z]")
 
 
 def articles_in(text: str) -> set[int]:
@@ -32,13 +34,18 @@ def articles_in(text: str) -> set[int]:
     the whole of Article 33 while its heading sits in the previous chunk.
     Requiring the heading would score a chunk containing the answer as a miss.
 
+    A numbered heading counts as well, so a manual whose sections are written
+    as "7. Error Codes" rather than "Section 7" is scored the same way.
+
     The cost is that a cross-reference counts too -- Article 35 saying "as
     referred to in Article 33" earns credit for 33. That inflates every
     configuration equally, so comparisons between them stay sound, but it
     means the absolute numbers here are an upper bound and should not be
     quoted as recall in any other sense.
     """
-    return {int(match.group(1)) for match in _ARTICLE.finditer(text)}
+    found = {int(match.group(1)) for match in _ARTICLE.finditer(text)}
+    found |= {int(match.group(1)) for match in _HEADING.finditer(text)}
+    return found
 
 
 @dataclass
