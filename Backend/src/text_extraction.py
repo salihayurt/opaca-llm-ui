@@ -34,6 +34,8 @@ import logging
 from dataclasses import dataclass
 from pathlib import Path
 
+from .text_repair import build_vocabulary, looks_shattered, repair_spacing
+
 logging.getLogger(__name__)
 logger = logging.getLogger(__name__)
 
@@ -288,6 +290,35 @@ def is_extractable(filename: str) -> bool:
     return Path(filename or "").suffix.lower() in SUPPORTED_EXTENSIONS
 
 
+def _repair_if_shattered(segments: list[TextSegment]) -> list[TextSegment]:
+    """Rejoin words that the PDF extractor split on kerning gaps.
+
+    Some publishers position individual characters with separate drawing
+    operations, and extractors read the gaps as word boundaries. EUR-Lex does
+    this: the GDPR comes out as 'REGUL A TIONS ... Ar ticle 33 ... Notif
+    ication of a personal dat a breach'.
+
+    Left alone, such a document contains no token 'article' and no token
+    'notification', so lexical search finds neither and BM25 contributes
+    nothing to hybrid retrieval. The vocabulary is rebuilt from the document
+    itself, so no word list ships with this.
+
+    Applied only when the text looks shattered, so an ordinary document is not
+    put through a transformation it does not need.
+    """
+    combined = "\n".join(segment.text for segment in segments)
+    if not looks_shattered(combined):
+        return segments
+
+    logger.info("Text appears split by kerning; repairing word spacing")
+    vocabulary = build_vocabulary(combined)
+    return [
+        TextSegment(text=repair_spacing(segment.text, vocabulary),
+                    location=segment.location)
+        for segment in segments
+    ]
+
+
 def extract_segments(filename: str, data: bytes) -> list[TextSegment]:
     """Extract `data` into located segments, dispatching on the file extension.
 
@@ -305,7 +336,7 @@ def extract_segments(filename: str, data: bytes) -> list[TextSegment]:
             f"No text extractor for '{extension or filename}'. "
             f"Supported: {', '.join(sorted(SUPPORTED_EXTENSIONS))}"
         )
-    return extractor(data)
+    return _repair_if_shattered(extractor(data))
 
 
 def extract_text(filename: str, data: bytes, separator: str = "\n\n") -> str:
