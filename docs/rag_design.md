@@ -263,6 +263,43 @@ questions users ask rather than of the pipeline. Hybrid stays on, since it is
 never far behind and is well ahead on German compounds, but it is not the
 free improvement the design assumed.
 
+### 6c. The compound-word question, settled
+
+Twenty-six German questions on the manual, all verifying. Twelve ask about a
+fragment of a compound the document contains ('Wechsel' where the text says
+'Filterwechsel'); eight of those have a control asking the same thing about
+the same section with the compound written out.
+
+| Configuration | compound R@3 | full R@3 | compound MRR | full MRR |
+|---|---|---|---|---|
+| hybrid, 300 | 0.917 | 0.750 | 0.812 | 0.688 |
+| hybrid, 500 | 0.917 | 0.750 | 0.847 | 0.740 |
+| hybrid, 800 | 0.917 | 0.750 | 0.826 | 0.729 |
+| dense only, 300 | 0.917 | 0.750 | 0.812 | 0.688 |
+| dense only, 500 | 0.917 | 0.750 | 0.847 | 0.740 |
+
+**The mechanism is real and the consequence is not.** BM25 genuinely
+contributes nothing to these queries -- checked directly, no fragment shares a
+token with its compound -- and it does not matter, because dense retrieval
+finds the passage anyway. Section 8's first open item is closed.
+
+**Fragment queries score better than full-compound ones**, consistently, by
+about 0.17 R@3 and 0.12 MRR. Query length does not explain it (6.5 tokens
+against 6.0). The likely reason is that the full compounds are the words this
+document repeats most -- 'Raumtemperaturregler' appears in eight of
+twenty-seven sections -- so a query containing one is close to everything and
+discriminates nothing, while a fragment lands in a narrower region. That is a
+hypothesis, not a measurement; what is measured is that the fragment queries
+do not suffer.
+
+**Hybrid and dense-only are identical here**, to three decimal places, on
+every configuration. Combined with the manual's English run, where dense-only
+was ahead, the case for BM25 now rests on a single result: the German GDPR,
+where hybrid led 0.560 to 0.398. That is one document out of four. Hybrid
+stays on, because it is never behind by much and the German GDPR advantage is
+real, but the design's assumption that it is a straightforward improvement
+does not survive the measurement.
+
 ### What the numbers cannot settle
 
 **The compound-word question is not answered.** All three surviving German
@@ -372,9 +409,14 @@ half on German queries specifically, not merely help on average.
 
 ## 8. Open questions
 
-1. **German compounds.** *Raumtemperaturregler* vs a query for
-   *Temperaturregler* — no punctuation fix helps. BM25 is half of hybrid
-   retrieval, so this is a first-class gap. Phase 3.
+1. ~~**German compounds.**~~ **Closed by measurement.** The concern was that
+   a query for *Temperaturregler* cannot match *Raumtemperaturregler* under
+   whitespace tokenisation, leaving half of hybrid retrieval inert in German.
+   The mechanism is real -- for every fragment/compound pair checked,
+   `tokenize()` produces no shared token, so BM25 contributes exactly zero.
+   The consequence is not: see 6c. Dense retrieval covers the gap completely,
+   and fragment queries in fact score *better* than the same questions asked
+   with the compound written out.
 2. **Multilingual reranker.** The CPU-viable option is English-only; the
    multilingual one needs a GPU; the API option costs ~1.5 s per query.
    Phase 3 compares all three.
