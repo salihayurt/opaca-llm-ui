@@ -22,7 +22,21 @@ _ARTICLE = re.compile(
     r"\b(?:article|artikel|art\.?|section|kapitel)\s*(\d{1,3})\b",
     re.IGNORECASE,
 )
-_HEADING = re.compile(r"(?:^|\n)\s*(\d{1,3})\.\s+[A-Z]")
+# A numbered heading, as manuals write them: "7. Error Codes".
+#
+# Off by default, because a regulation numbers its paragraphs the same way --
+# "1. In the case of a personal data breach" is paragraph one of some article,
+# not article one -- and counting those would credit almost every chunk with
+# articles it does not contain.
+#
+# It cannot be anchored on a line start either. The baseline's chunker joins
+# on whitespace and destroys line breaks, so a line-anchored pattern scored it
+# zero on every question of the manual set: eight chunks covering the whole
+# document, none recognised. That measured the metric, not the retriever.
+_HEADING = re.compile(r"(?:^|[\n.!?]|\s\|)\s*(\d{1,3})\.\s+[A-Z]")
+
+# Set by the harness according to which question set is in use.
+COUNT_NUMBERED_HEADINGS = False
 
 
 def articles_in(text: str) -> set[int]:
@@ -44,7 +58,8 @@ def articles_in(text: str) -> set[int]:
     quoted as recall in any other sense.
     """
     found = {int(match.group(1)) for match in _ARTICLE.finditer(text)}
-    found |= {int(match.group(1)) for match in _HEADING.finditer(text)}
+    if COUNT_NUMBERED_HEADINGS:
+        found |= {int(match.group(1)) for match in _HEADING.finditer(text)}
     return found
 
 

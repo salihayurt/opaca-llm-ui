@@ -52,6 +52,7 @@ from baseline import BaselineStore
 from metrics import QuestionResult, aggregate, format_scores, score_question
 import questions as gdpr_questions
 import questions_manual as manual_questions
+import questions_manual_de as manual_de_questions
 
 ALL = gdpr_questions.ALL
 
@@ -88,8 +89,12 @@ GRID = [
     Config("hybrid-800", chunk_tokens=800, chunk_overlap=80),
     Config("hybrid-1200", chunk_tokens=1200, chunk_overlap=100),
 
-    # retrieval mode
+    # retrieval mode. Both directions matter for the German compound
+    # question: BM25 alone shows what lexical search can reach when the query
+    # is a fragment of a compound (nothing, if the concern in Section 8 is
+    # right), and dense alone shows whether the semantic side covers for it.
     Config("dense-only", hybrid=False),
+    Config("dense-only-500", hybrid=False, chunk_tokens=500, chunk_overlap=75),
 
     # relevance floor -- the open question from docs/rag_design.md. The
     # baseline sets the equivalent of 0.85 and answers almost nothing; we set
@@ -226,12 +231,22 @@ async def main() -> int:
     parser.add_argument("--dry-run", action="store_true",
                         help="verify the question set against the document and stop")
     parser.add_argument("--skip-baseline", action="store_true")
-    parser.add_argument("--questions", choices=("gdpr", "manual"), default="gdpr",
-                        help="which question set to score against")
+    parser.add_argument("--questions", choices=("gdpr", "manual", "manual-de"),
+                        default="gdpr", help="which question set to score against")
     args = parser.parse_args()
 
     global ALL
-    ALL = manual_questions.ALL if args.questions == "manual" else gdpr_questions.ALL
+    ALL = {
+        "manual": manual_questions.ALL,
+        "manual-de": manual_de_questions.ALL,
+        "gdpr": gdpr_questions.ALL,
+    }[args.questions]
+
+    # A manual writes its sections as "7. Error Codes"; a regulation numbers
+    # its paragraphs the same way, so counting numbered headings there would
+    # credit chunks with articles they do not contain.
+    import metrics
+    metrics.COUNT_NUMBERED_HEADINGS = args.questions.startswith("manual")
 
     text, segments = await load_document(args.document)
     print(f"document: {args.document.name}")
