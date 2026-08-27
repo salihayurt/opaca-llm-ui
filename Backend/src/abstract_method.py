@@ -17,7 +17,7 @@ from litellm.types.llms.openai import ResponsesAPIStreamEvents as event_type
 
 from .models import (ToolApprovalState, SessionData, QueryResponse, AgentMessage, ChatMessage, OpacaException, Chat,
                      ToolCall, ToolType, ToolCallMessage, TextChunkMessage, MetricsMessage, StatusMessage, MethodConfig,
-                     MissingApiKeyNotification, MissingApiKeyResponse, LLMConfig)
+                    MissingApiKeyNotification, MissingApiKeyResponse, LLMConfig, StepType)
 from .file_utils import upload_files
 from .internal_tools import InternalTools
 from .opaca_client import actions_blacklist
@@ -86,6 +86,9 @@ class AbstractMethod(ABC):
             response_format: Optional[Type[BaseModel]] = None,
             status_message: str | None = None,
             is_output: bool = False,
+            step_type: StepType = StepType.TOOL_CALL,
+            iteration: int = 0,
+            parent_id: str | None = None,
     ) -> AgentMessage:
         """
         Calls an LLM with given parameters, including support for streaming, tools, file uploads, and response schema parsing.
@@ -100,6 +103,9 @@ class AbstractMethod(ABC):
             response_format (Optional[Type[BaseModel]]): Optional Pydantic schema to validate response.
             status_message (str): optional message to be streamed to the UI
             is_output (bool): whether agent output should be streamed directly to chat or only to debug
+            step_type (StepType): the semantic role of this step, for the explanation layer
+            iteration (int): which internal round this step belongs to
+            parent_id (str): id of the step that spawned this one, where steps nest
 
         Returns:
             AgentMessage: The final message returned by the LLM with metadata.
@@ -117,7 +123,10 @@ class AbstractMethod(ABC):
 
         # Initialize variables
         exec_time = time.time()
-        agent_message = AgentMessage(agent=agent, content='', tools=[])
+        agent_message = AgentMessage(
+            agent=agent, content='', tools=[],
+            step_type=step_type, model=model, iteration=iteration, parent_id=parent_id,
+        )
 
         file_message_parts = await upload_files(self.session, self.chat, model)
 

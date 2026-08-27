@@ -17,6 +17,25 @@ from .opaca_client import actions_blacklist
 # list of string-fragments; if any action or agent name contains one of those, SAGE will ask for confirmation before calling the tool
 actions_needing_confirmation: List[str] = []
 
+# Every failure path in invoke_tool writes a result starting with one of these.
+# A tool that legitimately returns text about an error ("No errors were found")
+# does not start with them, which is why this matches a prefix rather than
+# searching for the word anywhere in the result.
+_FAILURE_PREFIXES = (
+    "Failed to invoke tool.",
+    "Failed to invoke MCP tool.",
+    "Failed to invoke Internal tool.",
+    "Failed to invoke OPACA tool.",
+)
+
+
+def _classify_result(result) -> tuple[bool, str | None]:
+    """Decide whether a result represents a failure, and extract the error text."""
+    if isinstance(result, str) and result.startswith(_FAILURE_PREFIXES):
+        _, _, detail = result.partition("\n")
+        return False, (detail.strip() or result)
+    return True, None
+
 logger = logging.getLogger(__name__)
 
 
@@ -46,9 +65,20 @@ class ToolCaller:
         If OPACA invoke fails due to required login, attempt Login (via websocket callback) and try again.
         In any case returns a ToolCall, where "result" can be an error message.
         """
-        async def create_result(result):
+        async def create_result(result, success: bool | None = None, error: str | None = None):
+            """Build the finished ToolCall.
+
+            Every path out of invoke_tool goes through here, so recording the
+            outcome here is what makes it impossible to forget on one branch.
+            When the caller does not say, the outcome is inferred from the
+            prefix the failure paths below all write; that inference is the
+            fallback, not the mechanism.
+            """
+            if success is None:
+                success, error = _classify_result(result)
             await self.send_to_websocket(ToolResultMessage(id=tool.id, result=result, chat_id=self.chat_id))
-            return ToolCall(id=tool.id, type=tool.type, name=tool.name, args=tool.args, result=result)
+            return ToolCall(id=tool.id, type=tool.type, name=tool.name, args=tool.args,
+                            result=result, success=success, error=error)
 
         # If login_attempt_retry=True, the user has already been asked and allowed tool execution
         if not (login_attempt_retry or skip_approval):
@@ -159,6 +189,7 @@ class ToolCaller:
                 response = ContainerLoginResponse(**await self.session.websocket_receive())
                 if not (response.username and response.password):
                     tool.result = "Failed to invoke tool.\nNo credentials provided."
+                    tool.success, tool.error = _classify_result(tool.result)
                     return tool
                 
                 # Attempt to login at container via OPACA (error if immediate login-check fails)
