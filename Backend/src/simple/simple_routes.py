@@ -4,7 +4,8 @@ import time
 import json
 
 from ..abstract_method import AbstractMethod
-from ..models import QueryResponse, AgentMessage, ChatMessage, ToolCall, MethodConfig, ToolCallMessage, \
+from ..xai.rationale import extract_rationale
+from ..models import StepType, QueryResponse, AgentMessage, ChatMessage, ToolCall, MethodConfig, ToolCallMessage, \
     LLMConfig, ResetTextMessage
 
 SYSTEM_PROMPT = """
@@ -98,15 +99,22 @@ class SimpleMethod(AbstractMethod):
                 ],
                 tool_choice="none",
                 is_output=True,
+                iteration=self.response.iterations - 1,
             )
             self.response.agent_messages.append(result)
 
             try:
                 if not (tool := await self.find_tool(result.content)):
+                    # One call does both jobs here, so which one it did is only
+                    # knowable from what came back: no tool means this was the
+                    # answer. Set after the fact rather than guessed before.
+                    result.step_type = StepType.OUTPUT
                     break
 
                 tool.id = self.next_tool_id(result)
-                await self.send_to_websocket(ToolCallMessage(id=tool.id, name=tool.name, args=tool.args, agent="assistant", chat_id=self.chat.chat_id))
+                await self.send_to_websocket(ToolCallMessage(id=tool.id, name=tool.name, args=tool.args,
+                                                                     agent="assistant", chat_id=self.chat.chat_id,
+                                                                     rationale=tool.rationale))
                 tool_call = await self.invoke_tool(tool)
                 self.response.agent_messages.append(AgentMessage(
                     agent="assistant",

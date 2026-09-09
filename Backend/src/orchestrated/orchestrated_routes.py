@@ -9,7 +9,7 @@ from .prompts import (
     OUTPUT_GENERATOR_PROMPT, BACKGROUND_INFO, GENERAL_CAPABILITIES_RESPONSE, GENERAL_AGENT_DESC, INTERNAL_AGENT_DESC
 )
 from ..abstract_method import AbstractMethod, openapi_to_functions
-from ..models import QueryResponse, AgentMessage, ChatMessage, ToolCall, StatusMessage, MethodConfig, \
+from ..models import StepType, QueryResponse, AgentMessage, ChatMessage, ToolCall, StatusMessage, MethodConfig, \
     LLMConfig
 from .agents import (
     OrchestratorAgent,
@@ -47,6 +47,8 @@ class SelfOrchestratedMethod(AbstractMethod):
             config: OrchestrationConfig,
             all_results: List[AgentResult],
             agent_messages: List[AgentMessage],
+            parent_id: str | None = None,
+            iteration: int = 0,
     ) -> List[AgentResult]:
         """Execute a single round of tasks in parallel when possible. This corresponds to the
         tasks assigned to one "Worker-Trio" by the Orchestrator. Tasks are subdivided into rounds;
@@ -85,7 +87,10 @@ class SelfOrchestratedMethod(AbstractMethod):
                 system_prompt=worker_agent.system_prompt(),
                 messages=worker_agent.messages(subtask),
                 tool_choice="required",
-                tools=worker_agent.tools
+                tools=worker_agent.tools,
+                step_type=StepType.TOOL_CALL,
+                iteration=iteration,
+                parent_id=parent_id,
             )
 
             # Invoke the action on the connected opaca platform
@@ -134,7 +139,10 @@ class SelfOrchestratedMethod(AbstractMethod):
                     tools=planner.tools,
                     tool_choice="none",
                     response_format=planner.schema,
-                    status_message="Planning function calls for {task.agent_name}'s task: {task_str}"
+                    status_message="Planning function calls for {task.agent_name}'s task: {task_str}",
+                    step_type=StepType.PLAN,
+                    iteration=iteration,
+                    parent_id=parent_id,
                 )
                 agent_messages.append(planner_message)
                 plan = planner_message.formatted_output
@@ -201,6 +209,9 @@ class SelfOrchestratedMethod(AbstractMethod):
                     messages=agent.messages(task),
                     tool_choice="required",
                     tools=agent.tools,
+                    step_type=StepType.TOOL_CALL,
+                    iteration=iteration,
+                    parent_id=parent_id,
                 )
 
                 # Invoke the tool call on the connected opaca platform
@@ -216,7 +227,10 @@ class SelfOrchestratedMethod(AbstractMethod):
                         system_prompt=agent_evaluator.system_prompt(),
                         messages=agent_evaluator.messages(task_str, result),
                         response_format=agent_evaluator.schema,
-                        status_message=f"Evaluating {task.agent_name}'s task completion"
+                        status_message=f"Evaluating {task.agent_name}'s task completion",
+                        step_type=StepType.EVALUATE,
+                        iteration=iteration,
+                        parent_id=parent_id,
                     )
                     agent_messages.append(evaluation_message)
                     should_retry = evaluation_message.formatted_output.reiterate
@@ -252,7 +266,12 @@ Now, using the tools available to you and the previous results, continue with yo
                         messages=agent.messages(retry_task),
                         tool_choice="required",
                         tools=agent.tools,
-                        status_message="Retrying task"
+                        status_message="Retrying task",
+                        # The evaluator sent this task back; it is a retry, not
+                        # a second action the worker chose to take.
+                        step_type=StepType.CORRECTION,
+                        iteration=iteration,
+                        parent_id=parent_id,
                     )
 
                     result = await self.invoke_tools(agent, task.task, worker_message)
@@ -315,7 +334,9 @@ Now, using the tools available to you and the previous results, continue with yo
                     tools=orchestrator.tools,
                     tool_choice='none',
                     response_format=orchestrator.schema,
-                    status_message="Creating detailed orchestration plan"
+                    status_message="Creating detailed orchestration plan",
+                    step_type=StepType.ROUTING,
+                    iteration=rounds,
                 )
 
                 # Extract pre-formatted Orchestrator Plan
@@ -379,6 +400,12 @@ Now, using the tools available to you and the previous results, continue with yo
                         config,
                         all_results,
                         self.response.agent_messages,
+                        # Workers are appended from inside asyncio.gather, so
+                        # list order says nothing about what produced what.
+                        # The link back to the orchestrator step is the only
+                        # way to rebuild the structure afterwards.
+                        parent_id=orchestrator_message.id,
+                        iteration=rounds,
                     )
                     
                     all_results.extend(round_results)
@@ -391,7 +418,9 @@ Now, using the tools available to you and the previous results, continue with yo
                         system_prompt=overall_evaluator.system_prompt(),
                         messages=overall_evaluator.messages(message, all_results),
                         response_format=overall_evaluator.schema,
-                        status_message="Overall evaluation"
+                        status_message="Overall evaluation",
+                        step_type=StepType.EVALUATE,
+                        iteration=rounds,
                     )
                     should_retry = evaluation_message.formatted_output.reiterate
                     self.response.agent_messages.append(evaluation_message)
@@ -404,7 +433,9 @@ Now, using the tools available to you and the previous results, continue with yo
                         system_prompt=iteration_advisor.system_prompt(),
                         messages=iteration_advisor.messages(message, all_results),
                         response_format=iteration_advisor.schema,
-                        status_message="Analyzing results and preparing advice for next iteration"
+                        status_message="Analyzing results and preparing advice for next iteration",
+                        step_type=StepType.EVALUATE,
+                        iteration=rounds,
                     )
                     advice = advisor_message.formatted_output
                     self.response.agent_messages.append(advisor_message)
@@ -450,6 +481,8 @@ Please address these specific improvements:
                 messages=[ChatMessage(role="user", content=f"Based on the following execution results, please provide a clear response to this user request: {message}\n\nExecution results:\n{json.dumps([r.model_dump() for r in all_results], indent=2)}")],
                 status_message="Generating final response",
                 is_output=True,
+                step_type=StepType.OUTPUT,
+                iteration=rounds,
             )
             self.response.agent_messages.append(final_output)
 

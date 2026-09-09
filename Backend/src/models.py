@@ -140,7 +140,7 @@ class QueryRequest(BaseModel):
     user_query: str
     streaming: bool = False
 
-    
+
 class StepType(str, Enum):
     """
     The semantic role a step played, independent of which method produced it.
@@ -215,6 +215,13 @@ class QueryResponse(BaseModel):
             explanation attached to the wrong answer is worse than none.
     """
     response_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    # The generated explanation, once someone has asked for one. Stored here
+    # rather than in a store of its own: Chat.responses is already persisted
+    # and already returned to the frontend, so the explanation survives a
+    # restart for free and is deleted with the chat it belongs to. It does not
+    # reach the model -- Chat.messages projects only query and content.
+    xai: Dict[str, Any] | None = None
+    xai_hash: str = ''
     query: str = ''
     agent_messages: List[AgentMessage] = []
     iterations: int = 0
@@ -284,6 +291,10 @@ class ToolCall(BaseModel):
             reads like one.
         error: The error text when success is False, kept separately so it can be
             surfaced without re-parsing `result`.
+        rationale: Why the generating model chose this action, in its own words,
+            emitted in the same completion as the call. A self-report, but not a
+            post-hoc one: no outcome existed yet to rationalise.
+        considered: The alternative it rejected, when it named one.
     """
     id: str
     type: ToolType
@@ -292,8 +303,10 @@ class ToolCall(BaseModel):
     result: Any | None = None
     success: bool | None = None
     error: str | None = None
+    rationale: str | None = None
+    considered: str | None = None
 
-    _LLM_HIDDEN_FIELDS = {"id", "success", "error"}
+    _LLM_HIDDEN_FIELDS = {"id", "success", "error", "rationale", "considered"}
 
     def without_id(self):
         """representation for tool without ID field, to be passed back to LLM (ID can be confusing)
@@ -767,11 +780,17 @@ class ResetTextMessage(BaseModel):
 
 
 class ToolCallMessage(BaseModel):
+    """A tool call, pushed to the UI as it is generated.
+
+    `rationale` rides along so the debug view can show why a call was made at
+    the moment it appears, rather than only after the response has finished.
+    """
     agent: str
     id: str
     name: str
     args: Dict[str, Any] = {}
     chat_id: str
+    rationale: str | None = None
 
 
 class ToolResultMessage(BaseModel):
@@ -827,9 +846,119 @@ class PushMessage(QueryResponse):
     task_id: int
 
 
+class ParamSource(BaseModel):
+    """Where one argument of a pending tool call came from.
+
+    A plain wire model rather than the xai DataFlowEdge it is built from: the
+    xai package imports this module, so importing back would close a cycle.
+    Converted in tool_calling, which owns both sides.
+
+    Attributes:
+        param: JSON path of the argument, e.g. "room" or "target.name"
+        value: the value, rendered for display
+        source: "user_query", "tool_result", "prior_argument" or "unmatched"
+        kind: how it matched, or "weak" when the value was too common to judge
+        origin: human-readable source, e.g. "RoomAgent--GetFreeRooms (rooms[0].id)"
+    """
+    param: str
+    value: str
+    source: str
+    kind: str | None = None
+    origin: str | None = None
+
+
+class ChainNode(BaseModel):
+    """One tool call in the chain view.
+
+    Attributes:
+        order: position in the sequence, which is also the horizontal position
+        action: the action name without its agent, for the node label
+        sources: where each argument came from, shown when the node is opened
+    """
+    id: str
+    order: int
+    name: str
+    agent: str
+    action: str
+    type: str
+    args: Dict[str, Any] = {}
+    success: bool | None = None
+    error: str | None = None
+    iteration: int = 0
+    step_agent: str = ''
+    sources: List[ParamSource] = []
+    rationale: str | None = None
+    considered: str | None = None
+
+
+class ChainLink(BaseModel):
+    """A value flowing from one call's result into another call's argument.
+
+    Drawn only for edges that were actually resolved to a source; a value the
+    model supplied itself has no arrow to draw, which is the point.
+    """
+    from_id: str
+    to_id: str
+    param: str
+    kind: str | None = None
+
+
+class ConfidenceSignal(BaseModel):
+    """One observation that lowered confidence in a chain."""
+    id: str
+    detail: str
+    caps_at: str
+
+
+class CitationCheck(BaseModel):
+    """A citation in an answer whose passage does not back the sentence."""
+    number: int
+    sentence: str
+    missing: List[str] = []
+    source: str | None = None
+    reason: str | None = None
+
+
+class ChainView(BaseModel):
+    """The call chain of one response, ready to draw.
+
+    Everything here is computed from the recorded trace. No model is asked
+    anything, so the graph cannot show a step that did not happen.
+    """
+    response_id: str
+    query: str
+    nodes: List[ChainNode] = []
+    links: List[ChainLink] = []
+    steps: int = 0
+    failures: int = 0
+    untraceable: int = 0
+    models: List[str] = []
+    execution_time: float = .0
+    confidence: str = "high"
+    signals: List[ConfidenceSignal] = []
+    trace_hash: str = ""
+    unsupported_citations: List[CitationCheck] = []
+
+
 class ConfirmActionNotification(BaseModel):
+    """Asks the user to allow a tool call before it runs.
+
+    Everything past `params` is context for that decision, and all of it is
+    computed rather than generated -- the user is being asked to approve an
+    action, so what they are shown has to be established fact.
+
+    Attributes:
+        sources: where each argument came from; an "unmatched" entry is one
+            the model produced from neither the request nor any earlier result
+        prior_calls: tool calls already made while answering this request
+        prior_failures: how many of those failed
+    """
     tool: str
     params: dict
+    sources: List[ParamSource] = []
+    prior_calls: int = 0
+    prior_failures: int = 0
+    rationale: str | None = None
 
 
 class ConfirmActionResponse(BaseModel):

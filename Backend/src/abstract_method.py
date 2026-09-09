@@ -17,8 +17,9 @@ from litellm.types.llms.openai import ResponsesAPIStreamEvents as event_type
 
 from .models import (ToolApprovalState, SessionData, QueryResponse, AgentMessage, ChatMessage, OpacaException, Chat,
                      ToolCall, ToolType, ToolCallMessage, TextChunkMessage, MetricsMessage, StatusMessage, MethodConfig,
-                    MissingApiKeyNotification, MissingApiKeyResponse, LLMConfig, StepType)
+                     MissingApiKeyNotification, MissingApiKeyResponse, LLMConfig, StepType)
 from .file_utils import upload_files
+from .xai.rationale import add_rationale_field, extract_rationale, rationale_enabled
 from .internal_tools import InternalTools
 from .opaca_client import actions_blacklist
 from .tool_calling import ToolCaller
@@ -54,7 +55,7 @@ class AbstractMethod(ABC):
         self.streaming = streaming
         self.tool_counter = count(0)
         self.internal_tools = internal_tools
-        self.tool_caller = ToolCaller(session, internal_tools, streaming, chat.chat_id)
+        self.tool_caller = ToolCaller(session, internal_tools, streaming, chat.chat_id, response)
         if internal_tools is not None:
             # Tools that push their own websocket message need to address it to
             # a chat. InternalTools is built without one (it is also used
@@ -215,12 +216,23 @@ class AbstractMethod(ABC):
                         tool_type = self.tool_caller.determine_tool_type(t.name)
 
                         try:
-                            tool = ToolCall(name=t.name, type=tool_type, id=self.next_tool_id(agent_message), args=json.loads(t.arguments))
+                            args = json.loads(t.arguments)
                         except json.JSONDecodeError:
                             logger.warning(f"Could not parse tool arguments: {t.arguments}")
-                            tool = ToolCall(name=t.name, type=tool_type, id=self.next_tool_id(agent_message), args={})
+                            args = {}
+                        # Taken off the arguments the moment the call exists,
+                        # not later when it is invoked. The debug view and the
+                        # approval prompt both read the call before that, and
+                        # showing our own bookkeeping as though the model had
+                        # chosen to pass it is worse than not capturing it.
+                        args, why, considered = extract_rationale(args)
+                        tool = ToolCall(name=t.name, type=tool_type,
+                                        id=self.next_tool_id(agent_message), args=args,
+                                        rationale=why, considered=considered)
                         agent_message.tools.append(tool)
-                        await self.send_to_websocket(ToolCallMessage(id=tool.id, name=tool.name, args=tool.args, agent=agent, chat_id=self.chat.chat_id))
+                        await self.send_to_websocket(ToolCallMessage(id=tool.id, name=tool.name, args=tool.args,
+                                                                     agent=agent, chat_id=self.chat.chat_id,
+                                                                     rationale=tool.rationale))
                 # Capture token usage
                 agent_message.response_metadata = event.response.usage.model_dump()
 
@@ -280,6 +292,9 @@ class AbstractMethod(ABC):
             error += (f"WARNING: Your number of tools ({len(tools)}) exceeds the maximum tool limit "
                     f"of {max_tools}. All tools after index {max_tools} will be ignored!\n")
             tools = tools[:max_tools]
+
+        if rationale_enabled():
+            tools = [add_rationale_field(t) for t in tools]
         return tools, error
 
     async def handle_invalid_api_key(self, model, is_invalid: bool = False):

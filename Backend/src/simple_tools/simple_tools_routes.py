@@ -3,7 +3,7 @@ import logging
 import time
 
 from ..abstract_method import AbstractMethod
-from ..models import QueryResponse, AgentMessage, ChatMessage, MethodConfig, LLMConfig, ResetTextMessage
+from ..models import StepType, QueryResponse, AgentMessage, ChatMessage, MethodConfig, LLMConfig, ResetTextMessage
 
 SYSTEM_PROMPT = """You are a helpful ai assistant who answers user queries with the help of 
 tools. You can find those tools in the tool section. Do not generate optional 
@@ -57,11 +57,16 @@ class SimpleToolsMethod(AbstractMethod):
                 messages=messages,
                 tools=tools,
                 is_output=True,
+                iteration=self.response.iterations - 1,
             )
             self.response.agent_messages.append(result)
 
             try:
                 if not result.tools:
+                    # One call does both jobs here, so which one it did is only
+                    # knowable from what came back: no tools means this was the
+                    # answer. Set after the fact rather than guessed before.
+                    result.step_type = StepType.OUTPUT
                     break
 
                 tool_entries = await self.invoke_all_tools(result)

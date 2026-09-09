@@ -7,10 +7,12 @@ from litellm.experimental_mcp_client.client import MCPClient
 from mcp.types import CallToolRequestParams
 from pydantic import BaseModel
 
-from .models import (ToolApprovalState, SessionData,
+from .models import (ToolApprovalState, SessionData, QueryResponse,
                      ToolCall, ToolType, ContainerLoginNotification, ContainerLoginResponse,
-                     ToolResultMessage, ConfirmActionNotification, ConfirmActionResponse)
+                     ToolResultMessage, ConfirmActionNotification, ConfirmActionResponse,
+                     ParamSource)
 from .internal_tools import InternalTools
+from .xai.rationale import extract_rationale
 from .opaca_client import actions_blacklist
 
 
@@ -41,11 +43,15 @@ logger = logging.getLogger(__name__)
 
 class ToolCaller:
 
-    def __init__(self, session: SessionData, internal_tools: InternalTools = None, streaming: bool = False, chat_id: str = "none") -> None:
+    def __init__(self, session: SessionData, internal_tools: InternalTools = None, streaming: bool = False, chat_id: str = "none", response: QueryResponse = None) -> None:
         self.session = session
         self.internal_tools = internal_tools
         self.streaming = streaming
         self.chat_id = chat_id
+        # Held so the approval dialog can say where a pending call's arguments
+        # came from. Optional: a ToolCaller without one still works, it just
+        # asks for confirmation with less to go on.
+        self.response = response
 
 
     def determine_tool_type(self, tool_name: str) -> ToolType:
@@ -78,7 +84,16 @@ class ToolCaller:
                 success, error = _classify_result(result)
             await self.send_to_websocket(ToolResultMessage(id=tool.id, result=result, chat_id=self.chat_id))
             return ToolCall(id=tool.id, type=tool.type, name=tool.name, args=tool.args,
-                            result=result, success=success, error=error)
+                            result=result, success=success, error=error,
+                            rationale=tool.rationale, considered=tool.considered)
+
+        # The rationale rides in with the arguments and comes out here, before
+        # anything reads them: the approval prompt, the provenance matcher and
+        # the agent container all see the call as the model meant to make it,
+        # not as the schema we added a field to.
+        tool.args, why, considered = extract_rationale(tool.args)
+        tool.rationale = tool.rationale or why
+        tool.considered = tool.considered or considered
 
         # If login_attempt_retry=True, the user has already been asked and allowed tool execution
         if not (login_attempt_retry or skip_approval):
@@ -88,7 +103,7 @@ class ToolCaller:
                 # Should not happen due to filtering in get_tools, but double-checking approval status just in case it changes in the future
                 return await create_result("Failed to invoke tool.\nExecution denied by user settings, do not attempt again.")
                 
-            if approval_state == ToolApprovalState.ASK and not await self.check_confirmation(tool.name, tool.args):
+            if approval_state == ToolApprovalState.ASK and not await self.check_confirmation(tool):
                 return await create_result("Failed to invoke tool.\nExecution declined by user, do not attempt again.")
 
         # tools are always formatted the same; provider can be MCP server or OPACA agent
@@ -151,15 +166,52 @@ class ToolCaller:
         return user_approval
 
 
-    async def check_confirmation(self, tool_name: str, parameters: dict) -> bool:
+    async def check_confirmation(self, tool: ToolCall) -> bool:
         """Use websocket to ask user for confirmation before executing the action.
         Returns whether the action may be executed or not.
+
+        The notification carries where each argument came from. That is the
+        whole reason to compute provenance before a call rather than after: the
+        user is deciding, and an argument traceable to nothing is the one thing
+        that should change their mind.
         """
         if not self.session.has_websocket(): return False
+        notification = ConfirmActionNotification(tool=tool.name, params=tool.args,
+                                                 rationale=tool.rationale)
+        self._add_context(notification, tool)
         # ask user for confirmation, sharing lock-mechanism with container-login
         async with self.session.opaca_client.login_lock:
-            await self.session.websocket_send(ConfirmActionNotification(tool=tool_name, params=parameters))
+            await self.session.websocket_send(notification)
             return ConfirmActionResponse(**await self.session.websocket_receive()).allowed
+
+    def _add_context(self, notification: ConfirmActionNotification, tool: ToolCall) -> None:
+        """Fill in provenance and what has happened so far. Never fails the call.
+
+        A confirmation prompt that errors out would block a tool the user was
+        willing to allow, so a broken explanation degrades to no explanation.
+        """
+        if self.response is None:
+            return
+        try:
+            from .xai.provenance import edges_for_call
+            from .xai.trace import build_trace
+
+            trace = build_trace(self.response)
+            notification.prior_calls = len([c for c in trace.calls if c.id != tool.id])
+            notification.prior_failures = len(trace.failed_calls)
+            notification.sources = [
+                ParamSource(
+                    param=edge.to_param_path,
+                    value=edge.value,
+                    source=edge.source,
+                    kind=edge.kind,
+                    origin=(f"{edge.from_call_name} ({edge.from_path})"
+                            if edge.from_call_name else None),
+                )
+                for edge in edges_for_call(tool.id, tool.args, trace)
+            ]
+        except Exception as e:
+            logger.warning(f"Could not build approval context: {e}")
 
 
     async def handle_container_login(self, agent_name: str, action_name: str, tool: ToolCall, login_attempt_retry: bool = False):
@@ -210,4 +262,3 @@ class ToolCaller:
     async def send_to_websocket(self, message: BaseModel):
         if self.session.has_websocket() and self.streaming:
             await self.session.websocket_send(message)
-

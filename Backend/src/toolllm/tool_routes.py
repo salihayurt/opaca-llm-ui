@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from .prompts import GENERATOR_PROMPT, EVALUATOR_TEMPLATE, OUTPUT_GENERATOR_TEMPLATE, \
     OUTPUT_GENERATOR_NO_TOOLS, FILE_EVALUATOR_SYSTEM_PROMPT, FILE_EVALUATOR_TEMPLATE, OUTPUT_GENERATOR_SYSTEM_PROMPT
 from ..abstract_method import AbstractMethod
-from ..models import QueryResponse, ChatMessage, ToolCall, MethodConfig, LLMConfig, ToolResultMessage
+from ..models import StepType, QueryResponse, ChatMessage, ToolCall, MethodConfig, LLMConfig, ToolResultMessage
 
 
 class ToolLlmConfig(MethodConfig):
@@ -58,6 +58,8 @@ class ToolLLMMethod(AbstractMethod):
                     )),
                 ],
                 response_format=self.EvaluatorResponse,
+                step_type=StepType.EVALUATE,
+                iteration=0,
                 tools=tools,
                 tool_choice="none",
                 status_message="Checking if tools are needed",
@@ -87,7 +89,9 @@ class ToolLLMMethod(AbstractMethod):
                 ],
                 tool_choice="only",
                 tools=tools,
-                status_message="Generating Tool Calls"
+                status_message="Generating Tool Calls",
+                step_type=StepType.TOOL_CALL,
+                iteration=c_it,
             )
 
             if not result.tools:
@@ -115,7 +119,12 @@ class ToolLLMMethod(AbstractMethod):
                     ],
                     tool_choice="only",
                     tools=tools,
-                    status_message="Fixing Tool Calls"
+                    status_message="Fixing Tool Calls",
+                    # Not TOOL_CALL: this call exists because the previous one
+                    # was rejected, and a reader that cannot tell the two apart
+                    # reports a retry as a second, freely chosen action.
+                    step_type=StepType.CORRECTION,
+                    iteration=c_it,
                 )
                 correction_limit += 1
 
@@ -142,7 +151,9 @@ class ToolLLMMethod(AbstractMethod):
                     response_format=self.EvaluatorResponse,
                     tools=tools,
                     tool_choice="none",
-                    status_message="Evaluating Tool Call Results"
+                    status_message="Evaluating Tool Call Results",
+                    step_type=StepType.EVALUATE,
+                    iteration=c_it,
                 )
                 self.response.agent_messages.append(result)
 
@@ -181,6 +192,8 @@ class ToolLLMMethod(AbstractMethod):
             tool_choice="none",
             status_message="Generating final output",
             is_output=True,
+            step_type=StepType.OUTPUT,
+            iteration=c_it,
         )
         self.response.agent_messages.append(result)
 
