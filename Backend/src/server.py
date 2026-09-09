@@ -28,7 +28,8 @@ from openai import OpenAI
 from . import sample_prompts as prompts
 from .models import ConnectRequest, ToolApprovalUpdateRequest, QueryRequest, QueryResponse, ConfigPayload, Chat, RestrictedActions, \
     SearchResult, get_supported_models, SessionData, OpacaException, MCPCreateRequest, PushMessage, \
-    InvokeRequest, InvokeResponse, SessionPrompts, ReloadChatsMessage, OpacaFile, ToolCall, PlayBook
+    InvokeRequest, InvokeResponse, SessionPrompts, ReloadChatsMessage, OpacaFile, ToolCall, PlayBook, ChainView
+from .xai import build_chain, explain_response
 from .simple import SimpleMethod
 from .simple_tools import SimpleToolsMethod
 from .toolllm import ToolLLMMethod
@@ -348,6 +349,31 @@ async def query_chat(method: str, chat_id: str, message: QueryRequest, session: 
         await session.websocket_send(ReloadChatsMessage())
 
     return response
+
+
+@app.get("/chats/{chat_id}/responses/{response_id}/chain",
+         description="Get the call chain of one response: which tools ran, and which argument values came from which earlier result. Computed from the recorded trace; no LLM is involved.",
+         tags=["xai"])
+async def get_response_chain(chat_id: str, response_id: str, session: SessionData = Depends(handle_session_http)) -> ChainView:
+    chat = session.get_or_create_chat(chat_id)
+    response = next((r for r in chat.responses if r.response_id == response_id), None)
+    if response is None:
+        # Addressed by id rather than index: an index shifts if a response is
+        # ever inserted or removed, and an explanation shown against the wrong
+        # answer is worse than none.
+        raise OpacaException(f"No response {response_id} in chat {chat_id}", status_code=404)
+    return build_chain(response)
+
+
+@app.post("/chats/{chat_id}/responses/{response_id}/explain",
+          description="Write a readable account of how one response was produced. Costs one LLM call, cached on the response.",
+          tags=["xai"])
+async def explain_chat_response(chat_id: str, response_id: str, session: SessionData = Depends(handle_session_http)):
+    chat = session.get_or_create_chat(chat_id)
+    response = next((r for r in chat.responses if r.response_id == response_id), None)
+    if response is None:
+        raise OpacaException(f"No response {response_id} in chat {chat_id}", status_code=404)
+    return await explain_response(session, chat, response)
 
 
 @app.put("/chats/{chat_id}", description="Update a chat's name.", tags=["chat"])
