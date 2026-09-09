@@ -211,6 +211,15 @@
                         <i class="fa fa-chart-simple" />
                     </div>
 
+                    <!-- call chain: where this answer's values came from -->
+                    <div v-show="this.responseId"
+                         class="footer-item w-auto me-2"
+                         style="cursor: pointer;"
+                         @click.stop="this.toggleFooter('xai')"
+                         :title="Localizer.get('xai_chain')">
+                        <i class="fa fa-sitemap" />
+                    </div>
+
                     <!-- error handling -->
                     <div v-show="this.error !== null"
                          class="footer-item w-auto me-2"
@@ -253,6 +262,16 @@
                     </div>
                 </div>
 
+                <!-- footer: call chain -->
+                <div v-show="this.isFooterExpanded('xai')">
+                    <div class="bubble-debug-text overflow-auto p-2 mt-1 rounded-2"
+                         style="max-height: 420px">
+                        <XaiChain v-if="this.isFooterExpanded('xai')"
+                                  :chat-id="this.chatId"
+                                  :response-id="this.responseId" />
+                    </div>
+                </div>
+
                 <!-- footer: errors -->
                 <div v-show="this.isFooterExpanded('error')">
                     <div class="bubble-debug-text overflow-y-auto p-2 mt-1 rounded-2"
@@ -280,18 +299,25 @@ import Localizer from "../Localizer.js";
 import AudioManager from "../AudioManager.js";
 import {isDarkTheme} from "../ColorThemes.js";
 import Galleria from "primevue/galleria";
+import XaiChain from "./XaiChain.vue";
 
 export default {
     name: 'chatbubble',
-    components: {DebugMessage, Galleria},
+    components: {DebugMessage, Galleria, XaiChain},
     props: {
         elementId: String,
         isUser: Boolean,
         initialContent: String,
         initialLoading: Boolean,
         files: Array,
-        selectedChatId: String,
+        // Named to match what content.vue passes (:chat-id). It previously
+        // declared selectedChatId, which never bound, so every status message
+        // carried an undefined chat id.
+        chatId: String,
         isCollapsible: {type: Boolean, default: false},
+        // Set once the response arrives; the chain icon stays hidden until then
+        // because there is nothing to fetch without it.
+        responseId: {type: String, default: null},
     },
     emits: ['view-file'],
     setup() {
@@ -357,7 +383,10 @@ export default {
         },
 
         getToolCalls() {
-            const regex = /^Tool: (\d+)\nAgent: ([^\n]+)\nAction: ([^\n]+)\nArguments:((?:\n- [^\n]+)*)\n+(?:Result: (.+))?$/gs
+            // The optional Reason line sits between the arguments and the
+            // result. Without it here the whole block stops matching and the
+            // tools summary silently empties.
+            const regex = /^Tool: (\d+)\nAgent: ([^\n]+)\nAction: ([^\n]+)\nArguments:((?:\n- [^\n]+)*)\n+(?:Reason: ([^\n]*)\n)?(?:Result: (.+))?$/gs
             return this.debugMessages
                 .flatMap( debug => [...debug.text.matchAll(regex)] )
                 .map( match => {
@@ -365,7 +394,7 @@ export default {
                     const agent = match[2];
                     const action = match[3];
                     const params = match[4].replace("\n- ", " ");
-                    var results = match[5];
+                    var results = match[6];
                     if (results != null) results = results.replace(/\s+/g, " ").trim();
                     if (results != null && results.length > 30) results = results.substring(0, 30) + " [...]";
                     return `${id}. ${agent}: ${action}(${params}) → ${results}`;
@@ -396,12 +425,12 @@ export default {
         },
 
         addDebugMessage(text, type, id=null) {
-            const message = {id: id, text: text, type: type, chatId: this.selectedChatId};
+            const message = {id: id, text: text, type: type, chatId: this.chatId};
             utils.addDebugMessage(this.debugMessages, message);
         },
 
         setDebugMessage(text, type, id=null) {
-            const message = {id: id, text: text, type: type, chatId: this.selectedChatId};
+            const message = {id: id, text: text, type: type, chatId: this.chatId};
             utils.replaceDebugMessage(this.debugMessages, message);
         },
 

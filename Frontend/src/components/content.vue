@@ -47,7 +47,7 @@
                 @scroll="this.handleChatScroll">
                 <div class="chatbubble-container d-flex flex-column justify-content-between mx-auto">
                     <Chatbubble
-                        v-for="{ elementId, isUser, content, isLoading, files } in this.messages"
+                        v-for="{ elementId, isUser, content, isLoading, files, responseId } in this.messages"
                         :key="content"
                         :element-id="elementId"
                         :is-user="isUser"
@@ -55,6 +55,7 @@
                         :initial-loading="isLoading"
                         :files="files"
                         :chat-id="this.selectedChatId"
+                        :response-id="responseId"
                         @view-file="openViewer"
                         :ref="elementId"
                     />
@@ -376,6 +377,8 @@ export default {
 
         applyFinalResponse(response, aiBubble) {
             if (!response || !aiBubble) return;
+            const message = this.messages.find(m => m.elementId === aiBubble.elementId);
+            if (message) message.responseId = response.response_id ?? null;
             if (response.error) {
                 aiBubble.setError(response.error);
                 this.$refs.sidebar.$refs.debug.addDebugMessage(`\n${response.content}\n\nCause: ${response.error}\n`, "ERROR");
@@ -709,7 +712,7 @@ export default {
          * @param files {Array} files attached to the message
          * later (streaming responses etc.)
          */
-        async addChatBubble(content, isUser = false, isLoading = false, files = null) {
+        async addChatBubble(content, isUser = false, isLoading = false, files = null, responseId = null) {
             const elementId = `chatbubble-${this.messages.length}`;
 
             const message = {
@@ -718,6 +721,10 @@ export default {
                 content: content,
                 isLoading: isLoading,
                 files: files,
+                // Identifies the response this bubble shows, so the call chain
+                // can be fetched for it. Null while the answer is still being
+                // generated: there is no trace to read yet.
+                responseId: responseId,
             };
             this.messages.push(message);
 
@@ -749,7 +756,11 @@ export default {
             const id = tool.id.split("/")[1];
             const [agent, action] = tool.name.split("--");
             const args = Object.entries(tool.args).map(([k, v]) => `- ${k}: ${JSON.stringify(v)}`).join("\n");
-            const toolOutput = `Tool: ${id}\nAgent: ${agent}\nAction: ${action}\nArguments:\n${args}\n`;
+            // On its own line and labelled, not folded in with the arguments:
+            // it is what the assistant said about the call, not something it
+            // passed to the action.
+            const reason = tool.rationale ? `Reason: ${tool.rationale}\n` : "";
+            const toolOutput = `Tool: ${id}\nAgent: ${agent}\nAction: ${action}\nArguments:\n${args}\n${reason}`;
             this.addDebug(toolOutput, llm_agent, tool.id);
         },
 
@@ -821,7 +832,7 @@ export default {
 
                     // response
                     const isLoading = !chat.is_finished && index === numResponses - 1;
-                    await this.addChatBubble(msg.content, false, isLoading);
+                    await this.addChatBubble(msg.content, false, isLoading, null, msg.response_id ?? null);
                     await nextTick();
                     const aiBubble = this.getLastBubble();
 

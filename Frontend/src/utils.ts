@@ -99,6 +99,16 @@ class BackendClient {
 
     // TODO query stream
 
+    /** The call chain of one response: which tools ran and where their arguments came from. */
+    async responseChain(chatId: string, responseId: string): Promise<any> {
+        return this.sendRequest("GET", `chats/${chatId}/responses/${responseId}/chain`);
+    }
+
+    /** A readable account of how one response was produced. Costs one LLM call. */
+    async explainResponse(chatId: string, responseId: string): Promise<any> {
+        return this.sendRequest("POST", `chats/${chatId}/responses/${responseId}/explain`);
+    }
+
     async stopChat(chatId: string): Promise<void> {
         await this.sendRequest("POST", `chats/${chatId}/stop`);
     }

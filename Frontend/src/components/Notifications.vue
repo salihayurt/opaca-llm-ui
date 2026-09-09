@@ -101,7 +101,8 @@ export default {
                     const id = tool.id.split("/")[1];
                     const [agent, action] = tool.name.split("--");
                     const args = Object.entries(tool.args).map(([k, v]) => `- ${k}: ${JSON.stringify(v)}`).join("\n");
-                    const toolOutput = `Tool: ${id}\nAgent: ${agent}\nAction: ${action}\nArguments:\n${args}\nResult: ${formatToolDebugResult(tool.result)}`;
+                    const reason = tool.rationale ? `Reason: ${tool.rationale}\n` : "";
+                    const toolOutput = `Tool: ${id}\nAgent: ${agent}\nAction: ${action}\nArguments:\n${args}\n${reason}Result: ${formatToolDebugResult(tool.result)}`;
                     chatBubble.addDebugMessage(toolOutput, msg.agent, tool.id);
                 }
             }

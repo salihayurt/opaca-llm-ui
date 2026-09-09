@@ -49,6 +49,25 @@ export interface ToolCall {
     name: string;
     args: Record<string, any>;
     result: any | null;
+    success?: boolean | null;
+    error?: string | null;
+}
+
+/** Where one argument of a pending tool call came from. Computed, not generated. */
+export interface ParamSource {
+    param: string;
+    value: string;
+    source: "user_query" | "tool_result" | "prior_argument" | "unmatched";
+    kind?: "exact" | "normalised" | "substring" | "reworded" | "weak" | null;
+    origin?: string | null;
+}
+
+export interface ConfirmActionNotification {
+    tool: string;
+    params: Record<string, any>;
+    sources?: ParamSource[];
+    prior_calls?: number;
+    prior_failures?: number;
 }
 
 export interface AgentMessage {
@@ -59,9 +78,14 @@ export interface AgentMessage {
     response_metadata: Record<string, any>;
     execution_time: number;
     formatted_output: any | null;
+    step_type?: string;
+    model?: string;
+    iteration?: number;
+    parent_id?: string | null;
 }
 
 export interface QueryResponse {
+    response_id?: string;
     query: string;
     agent_messages: AgentMessage[];
     iterations: number;

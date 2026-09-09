@@ -255,11 +255,72 @@ export default {
             await this.$refs.input.showInfo(null, message);
         },
 
+        /**
+         * Escape text that reaches the dialog, which renders as HTML.
+         *
+         * Tool names, parameter values and origins all originate from a model
+         * or an MCP server, so none of them are ours to trust.
+         */
+        escapeForDialog(text) {
+            return String(text)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        },
+
+        /**
+         * Where one argument came from, in as few words as fit on the line.
+         *
+         * The origin arrives as "RoomAgent--GetFreeRooms (rooms[0].id)"; only
+         * the action name is kept. The agent is already obvious from the tool
+         * being confirmed, and the JSON path answers a question nobody asks
+         * while deciding whether to allow something.
+         */
+        describeParamSource(source) {
+            if (!source) return '';
+            // A value like -1 or "de" occurs in almost any result, so a match
+            // would mean nothing and none was attempted. Saying so beats an
+            // empty line, which reads as an omission rather than a decision.
+            if (source.kind === 'weak') return Localizer.get('confirm_notChecked');
+            const action = this.escapeForDialog(
+                (source.origin ?? '').split(' ')[0].split('--').pop());
+            switch (source.source) {
+                case 'user_query':
+                    return Localizer.get('confirm_fromYourRequest');
+                case 'tool_result':
+                    return `${Localizer.get('confirm_fromResult')} ${action}`;
+                case 'prior_argument':
+                    return `${Localizer.get('confirm_reused')} ${action}`;
+                default:
+                    return `⚠️ ${Localizer.get('confirm_notTraceable')}`;
+            }
+        },
+
+        /**
+         * Build the confirmation prompt.
+         *
+         * Each parameter carries its origin on the same line, because the
+         * prompt appears anyway and the origin is the reason it is worth
+         * reading. Kept to a few words: someone deciding whether to allow an
+         * action reads for a second or two, and a paragraph per parameter
+         * buries the one line that should stop them.
+         */
         async handleConfirmAction(confirmActionDetails) {
-            let message = `**Tool:** ${confirmActionDetails.tool}\n`;
+            const sources = {};
+            (confirmActionDetails.sources ?? []).forEach(s => { sources[s.param] = s; });
+
+            let message = `**Tool:** ${this.escapeForDialog(confirmActionDetails.tool)}\n`;
             Object.entries(confirmActionDetails.params).forEach( ([key, val]) => {
-                message += `* **${key}:** \`${JSON.stringify(val)}\`\n`;
+                const origin = this.describeParamSource(sources[key]);
+                const suffix = origin ? ` — ${origin}` : '';
+                message += `* **${this.escapeForDialog(key)}:** \`${this.escapeForDialog(JSON.stringify(val))}\`${suffix}\n`;
             });
+
+            // The assistant's own words for why it wants this, taken when it
+            // made the call rather than asked for afterwards. Quoted so it
+            // reads as a claim by the assistant, not a statement by the system.
+            if (confirmActionDetails.rationale) {
+                message += `\n> ${this.escapeForDialog(confirmActionDetails.rationale)}\n`;
+            }
+
             await this.$refs.input.showDialogue(
                 "Confirm Action",
                 message,
