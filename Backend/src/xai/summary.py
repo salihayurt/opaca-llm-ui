@@ -66,7 +66,6 @@ class _ModelSummary(BaseModel):
     """
     headline: str
     steps: list[SummaryStep]
-    caveats: list[str]
     confidence: str
 
 
@@ -148,8 +147,9 @@ Rules:
 - Use only what is in the log. If the log does not say why something happened, \
 say that it does not, rather than supplying a reason.
 - Every step you write must cite the bracketed ids it describes, in `refs`.
-- Where a value "CAME FROM NOWHERE", say so plainly in the caveats: the \
-assistant supplied it, and the user may want to check it.
+- Where a value "CAME FROM NOWHERE", say so in the step that used it: the \
+assistant supplied it rather than reading it from anywhere. A value the log \
+shows a tool returning is sourced -- never suggest the assistant made it up.
 - Where a call has a stated reason, you may quote it, but attribute it: it is \
 what the assistant said, not something established.
 - Write for someone who did not read the log. Short sentences, no jargon.
@@ -183,7 +183,13 @@ def validate(model_output: _ModelSummary, trace: ExecutionTrace,
     return XaiSummary(
         headline=model_output.headline,
         steps=steps,
-        caveats=model_output.caveats,
+        # Not the model's. A caveat is a finding, and findings here are
+        # computed: the model kept warning that the assistant had supplied
+        # values the tools had plainly returned, because a required field
+        # invites filling and the instruction to flag invented values gave it a
+        # phrase to reach for. Narrating is its job; deciding what is wrong is
+        # not.
+        caveats=[s.detail for s in report.signals],
         confidence=lower_only(report.level, model_output.confidence),
         generated=True,
         dropped_refs=dropped,

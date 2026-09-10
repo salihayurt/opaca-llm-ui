@@ -73,7 +73,7 @@ class TestWhatTheModelIsShown:
 class TestReferenceChecking:
     def test_a_grounded_summary_survives(self):
         trace, _, report = _parts()
-        written = _ModelSummary(headline="Looked up the room, then read its sensor.", caveats=[], confidence="high", steps=[SummaryStep(title="Found the room", detail="…", refs=["s1", "s1/0"])],
+        written = _ModelSummary(headline="Looked up the room, then read its sensor.", confidence="high", steps=[SummaryStep(title="Found the room", detail="…", refs=["s1", "s1/0"])],
         )
 
         summary = validate(written, trace, report)
@@ -83,7 +83,7 @@ class TestReferenceChecking:
 
     def test_an_invented_reference_is_dropped(self):
         trace, _, report = _parts()
-        written = _ModelSummary(headline="…", caveats=[], confidence="high", steps=[SummaryStep(title="A step", detail="…", refs=["s1", "s9/9", "s1/0"])],
+        written = _ModelSummary(headline="…", confidence="high", steps=[SummaryStep(title="A step", detail="…", refs=["s1", "s9/9", "s1/0"])],
         )
 
         summary = validate(written, trace, report)
@@ -95,7 +95,7 @@ class TestReferenceChecking:
         """Past a point it is not describing the log it was given, and a fluent
         account of steps that did not happen is worse than a dull correct one."""
         trace, _, report = _parts()
-        written = _ModelSummary(headline="Booked a room and sent three emails.", caveats=[], confidence="high", steps=[SummaryStep(title="Invented", detail="…", refs=["x1", "x2", "x3"])],
+        written = _ModelSummary(headline="Booked a room and sent three emails.", confidence="high", steps=[SummaryStep(title="Invented", detail="…", refs=["x1", "x2", "x3"])],
         )
 
         summary = validate(written, trace, report)
@@ -105,7 +105,7 @@ class TestReferenceChecking:
     def test_a_summary_with_no_references_is_not_discarded(self):
         """Nothing was invented; there is just nothing to check."""
         trace, _, report = _parts()
-        written = _ModelSummary(headline="…", caveats=[], confidence="high", steps=[
+        written = _ModelSummary(headline="…", confidence="high", steps=[
             SummaryStep(title="A step", detail="…", refs=[])])
 
         assert validate(written, trace, report).generated
@@ -114,7 +114,7 @@ class TestReferenceChecking:
 class TestConfidenceStaysOurs:
     def test_the_model_may_lower_it(self):
         trace, _, report = _parts()
-        written = _ModelSummary(headline="…", steps=[], caveats=[], confidence="low")
+        written = _ModelSummary(headline="…", steps=[], confidence="low")
 
         assert validate(written, trace, report).confidence == "low"
 
@@ -125,7 +125,7 @@ class TestConfidenceStaysOurs:
         trace, _, report = _parts(response)
         assert report.level == "medium"
 
-        written = _ModelSummary(headline="…", steps=[], caveats=[], confidence="high")
+        written = _ModelSummary(headline="…", steps=[], confidence="high")
 
         assert validate(written, trace, report).confidence == "medium"
 
@@ -196,7 +196,7 @@ class TestTheDiscardThreshold:
 
     def test_one_bad_reference_among_several_is_a_slip_not_a_fabrication(self):
         trace, _, report = _parts()
-        written = _ModelSummary(headline="…", caveats=[], confidence="high", steps=[
+        written = _ModelSummary(headline="…", confidence="high", steps=[
             SummaryStep(title="A step", detail="…", refs=["s1", "s1/0", "s9/9"])])
 
         summary = validate(written, trace, report)
@@ -207,7 +207,7 @@ class TestTheDiscardThreshold:
     def test_a_single_reference_that_is_wrong_still_discards(self):
         """Nothing it claimed is in the trace."""
         trace, _, report = _parts()
-        written = _ModelSummary(headline="…", caveats=[], confidence="high", steps=[
+        written = _ModelSummary(headline="…", confidence="high", steps=[
             SummaryStep(title="A step", detail="…", refs=["nope", "also-nope"])])
 
         assert not validate(written, trace, report).generated
@@ -329,7 +329,7 @@ class TestFormattedOutputShapes:
         from src.models import AgentMessage, Chat, SessionData
         from src.xai.explainer import XaiExplainer
 
-        written = _ModelSummary(headline="Looked it up.", caveats=[], confidence="high",
+        written = _ModelSummary(headline="Looked it up.", confidence="high",
                                 steps=[SummaryStep(title="Step", detail="…", refs=["s1"])])
         message = AgentMessage(agent="x")
         message.formatted_output = written if shape == "model" else written.model_dump()
@@ -387,3 +387,50 @@ class TestTheLogShowsWhatToolsReturned:
     def test_an_empty_result_is_shown_as_empty_not_omitted(self):
         """"Returned nothing" is a finding; a silent line is not."""
         assert "returned: {}" in self._rendered(result={})
+
+
+class TestCaveatsAreComputedNotWritten:
+    """The model kept warning about facts the tools had returned.
+
+    Twice: first because the log never said what a call returned, and again
+    after that was fixed, because `caveats` was a required field it felt
+    obliged to fill and the instruction to flag invented values gave it a
+    phrase to reach for -- "The assistant supplied the CO2 level of 1200 ppm,
+    and the user may want to verify this information", about a number
+    GetCo2Level had plainly returned.
+
+    A caveat is a finding, and findings here are computed. So the model no
+    longer writes them: narrating is its job, deciding what is wrong is not.
+    That removes the whole class rather than the instance.
+    """
+
+    def test_the_model_is_not_asked_for_caveats(self):
+        from src.xai.summary import _ModelSummary
+
+        assert "caveats" not in _ModelSummary.model_json_schema()["properties"]
+
+    def test_a_clean_chain_produces_no_caveats(self):
+        """The case that was failing: everything sourced, nothing to warn about."""
+        trace, _, report = _parts()
+        written = _ModelSummary(headline="Looked it up.", confidence="high", steps=[
+            SummaryStep(title="Step", detail="…", refs=["s1"])])
+
+        assert validate(written, trace, report).caveats == []
+
+    def test_a_real_finding_still_appears(self):
+        """Removing the model's caveats must not remove the caveats."""
+        response = _response()
+        response.agent_messages[0].tools[0].success = False
+        response.agent_messages[0].tools[0].error = "timeout"
+        trace, _, report = _parts(response)
+        written = _ModelSummary(headline="…", confidence="high", steps=[])
+
+        caveats = validate(written, trace, report).caveats
+
+        assert any("failed" in c for c in caveats)
+
+    def test_the_prompt_says_a_returned_value_is_sourced(self):
+        """The instruction that produced the wrong warning, now bounded."""
+        from src.xai.summary import SYSTEM_PROMPT
+
+        assert "never suggest the assistant made it up" in SYSTEM_PROMPT
